@@ -356,24 +356,55 @@ function pdfDari_(html, nama) {
 
 function buatPdfSPL_(rows) {
   const r0 = rows[0], P = param_();
-  const setuju = rows.filter(r => r['Status'] === ST.SETUJU);
+  const tidak = rows.filter(r => r['Status'] === ST.TIDAK);
+  const bersedia = rows.filter(r => r['Status'] !== ST.TIDAK);
+  const setuju = bersedia.filter(r => r['Status'] === ST.SETUJU);
   const totJam = setuju.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0);
-  const isiTabel = rows.map((r, i) => '<tr>' +
-    tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
-    tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
-    tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') + tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') +
-    tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(selStatus_(r)) + tdP_(selAtasan_(r)) + '</tr>').join('');
   const totKomp = setuju.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0);
-  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
+  const judulTabel = t => '<div style="font-weight:bold;font-size:11px;margin:12px 0 4px;color:#3A3A3A">' + t + '</div>';
+  const tot = (lbl, span, isi, sisa) => '<tr><td colspan="' + span + '" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + lbl + '</td>' +
+    isi.map(x => '<td style="padding:5px;border:1px solid #BBB;text-align:' + x[1] + ';font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + x[0] + '</td>').join('') +
+    (sisa ? '<td colspan="' + sisa + '" style="border:1px solid #BBB;background:#EFF0F2"></td>' : '') + '</tr>';
+  const persetujuan = r => {
+    if (r['Status'] === ST.SETUJU || r['Status'] === ST.TOLAK)
+      return '<b style="color:' + (WARNA_ST_[r['Status']] || '#222') + '">' + escH_(r['Status']) + '</b><br>' + escH_(r['Disetujui Oleh']) +
+        '<br><span style="color:#777">' + waktuIndo_(r['Disetujui Pada']) + '</span>' + (r['Catatan Atasan'] ? '<br><i>' + escH_(r['Catatan Atasan']) + '</i>' : '');
+    return '<b style="color:#9A6200">' + escH_(r['Status']) + '</b>';
+  };
+
+  // A. Karyawan yang bersedia lembur
+  let html = judulTabel('A. KARYAWAN YANG BERSEDIA LEMBUR (' + bersedia.length + ' orang)');
+  if (bersedia.length) {
+    html += '<table style="border-collapse:collapse;width:100%"><tr>' +
+      ['No', 'Employee ID', 'Full Name', 'Mulai', 'Selesai', 'Istirahat', 'Jam Efektif', 'Estimasi Kompensasi', 'Uraian Pekerjaan', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' +
+      bersedia.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
+        tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
+        tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') + tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') +
+        tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(persetujuan(r)) + '</tr>').join('') +
+      tot('TOTAL LEMBUR DISETUJUI (' + setuju.length + ' dari ' + bersedia.length + ' karyawan)', 6,
+        [[String(totJam).replace('.', ','), 'center'], [rpH_(totKomp), 'right']], 2) + '</table>';
+  } else {
+    html += '<div style="font-size:9px;color:#777">Tidak ada karyawan yang bersedia lembur.</div>';
+  }
+
+  // B. Karyawan yang tidak bersedia lembur (hanya bila ada)
+  if (tidak.length) {
+    html += judulTabel('B. KARYAWAN YANG TIDAK BERSEDIA LEMBUR (' + tidak.length + ' orang)') +
+      '<table style="border-collapse:collapse;width:100%"><tr>' +
+      ['No', 'Employee ID', 'Full Name', 'Rencana Jam', 'Uraian Pekerjaan', 'Alasan Tidak Bersedia', 'Waktu Konfirmasi'].map(thP_).join('') + '</tr>' +
+      tidak.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
+        tdP_(escH_(r['Jam Mulai']) + ' – ' + escH_(r['Jam Selesai']), 'text-align:center;white-space:nowrap') + tdP_(escH_(r['Uraian Pekerjaan'])) +
+        tdP_(escH_(r['Alasan Tidak Bersedia'] || '-')) + tdP_(waktuIndo_(r['Konfirmasi Pada']) || '-') + '</tr>').join('') + '</table>';
+  }
+
+  const doc = '<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
     kopPdf_('SURAT PERINTAH LEMBUR (SPL)', r0['Nomor SPL']) +
-    '<table style="font-size:10px;margin-bottom:8px"><tr><td style="width:110px">Tanggal Lembur</td><td>: <b>' + escH_(r0['Hari']) + ', ' + tglIndo_(r0['Tanggal Lembur']) + '</b></td></tr>' +
+    '<table style="font-size:10px;margin-bottom:4px"><tr><td style="width:110px">Tanggal Lembur</td><td>: <b>' + escH_(r0['Hari']) + ', ' + tglIndo_(r0['Tanggal Lembur']) + '</b></td></tr>' +
     '<tr><td>Status Hari</td><td>: ' + escH_(r0['Status Hari']) + '</td></tr><tr><td>Dibuat oleh</td><td>: ' + escH_(r0['Dibuat Oleh']) + ' — ' + waktuIndo_(r0['Dibuat Pada']) + '</td></tr></table>' +
-    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Mulai', 'Selesai', 'Istirahat', 'Jam Efektif', 'Estimasi Kompensasi', 'Uraian Pekerjaan', 'Status', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' + isiTabel +
-    '<tr><td colspan="6" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL JAM LEMBUR DISETUJUI (' + setuju.length + ' dari ' + rows.length + ' karyawan)</td>' +
-    '<td style="padding:5px;border:1px solid #BBB;text-align:center;font-weight:bold;font-size:9px;background:#EFF0F2">' + String(totJam).replace('.', ',') + '</td><td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + rpH_(totKomp) + '</td><td colspan="3" style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
+    html +
     '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL ' + escH_(P.NAMA_PERUSAHAAN || '') +
     '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(r0['Dibuat Oleh'], 'Admin') + '</body></html>';
-  return pdfDari_(html, 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(r0['Tanggal Lembur'], TZ, 'dd-MM-yyyy') + ').pdf');
+  return pdfDari_(doc, 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(r0['Tanggal Lembur'], TZ, 'dd-MM-yyyy') + ').pdf');
 }
 function ttdPdf_(nama, jabatan) {
   return '<table style="width:100%;margin-top:18px;font-size:10px;text-align:center"><tr><td>Dibuat oleh,</td><td>Diketahui oleh,</td><td>Disetujui oleh,</td></tr>' +
