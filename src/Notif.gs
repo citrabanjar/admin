@@ -179,7 +179,7 @@ function halamanAksi_(p) {
     if (!r) throw new Error('Data tidak ditemukan (mungkin sudah dihapus).');
     const I = induk_(jenis, r[J.kunci], r);
     const sudah = tipe === 'k' ? r['Status'] !== ST.KONFIRMASI : r['Status'] !== ST.ATASAN;
-    isi = '<h2>' + (tipe === 'k' ? 'Konfirmasi Kesediaan ' : 'Persetujuan ') + J.kata + '</h2>' + tabelDetail_(jenis, r, I).replace(/width:150px/g, 'width:130px');
+    isi = '<h2>' + (tipe === 'k' ? 'Konfirmasi Kesediaan ' : 'Persetujuan ') + J.kata + '</h2>' + tabelDetail_(jenis, r, I, tipe === 'k').replace(/width:150px/g, 'width:130px');   // estimasi kompensasi hanya untuk halaman karyawan
     if (tipe === 't') isi += '<p class="sub">Karyawan telah menyatakan <b>BERSEDIA</b>' + (r['Konfirmasi Pada'] instanceof Date ? ' pada ' + waktuIndo_(r['Konfirmasi Pada']) : '') + '.</p>';
     if (sudah) {
       isi += '<div class="msg info">Sudah diproses — status saat ini: <b>' + escH_(r['Status']) + '</b>.</div>';
