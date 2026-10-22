@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'ADMIN', 'BOSS'];   // BOSS = owner, menerima rekap lembur semua admin   // ADMIN = boleh login form & membuat surat
+const PERAN = ['KARYAWAN', 'ADMIN'];   // owner = karyawan dengan Atasan = BOSS (menerima rekap lembur semua admin)   // ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */

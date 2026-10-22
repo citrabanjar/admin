@@ -289,15 +289,15 @@ function namaAtasan_(employeeId) {
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
-/** Owner (BOSS): karyawan aktif ber-email dengan Peran = BOSS atau Employee ID = BOSS */
+/** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.email && (k.peran === 'BOSS' || k.id === 'BOSS'));
+  return Object.values(karyawan_()).filter(k => k.aktif && k.email && (k.atasan === 'BOSS' || k.peran === 'BOSS' || k.id === 'BOSS'));
 }
 /** Atasan langsung dari kolom "Atasan" (Employee ID). */
 function cariAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
   if (!k || !k.atasan) return null;
-  const a = K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null);
+  const a = K[k.atasan] || (k.atasan === 'BOSS' && !owner_().some(o => o.id === k.id) ? owner_()[0] : null);
   return a && a.email && a.aktif ? a : null;
 }
 
