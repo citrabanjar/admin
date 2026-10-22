@@ -344,7 +344,8 @@ function setupAwal() {
   }
   // Parameter tambahan (dibuat bila belum ada)
   const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
-  [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).']]
+  [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).'],
+   ['INSTRUKSI_KANTORKU', INSTRUKSI_KANTORKU_DEFAULT, 'Instruksi setelah karyawan klik Bersedia (halaman konfirmasi). Baris 1 = judul, baris berikutnya = langkah. Tekan Ctrl+Enter untuk baris baru di sel.']]
     .forEach(r => { if (adaP.indexOf(r[0]) < 0) shP.appendRow(r); });
   _P = null;
 
@@ -1014,6 +1015,24 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
     '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
 }
 
+/* ======================= Instruksi KantorKu (setelah karyawan Bersedia) ======================= */
+const INSTRUKSI_KANTORKU_DEFAULT = [
+  'Langkah selanjutnya: ajukan lembur Anda melalui aplikasi KantorKu.',
+  'Buka aplikasi KantorKu, lalu pilih menu Lembur / Overtime.',
+  'Buat pengajuan lembur baru dengan tanggal, jam mulai & jam selesai sesuai rincian di atas.',
+  'Tulis uraian pekerjaan dan cantumkan Nomor SPL pada keterangan.',
+  'Kirim pengajuan, lalu tunggu persetujuan atasan di KantorKu.'
+].join('\n');
+/** Kotak instruksi. Teks diambil dari Parameter INSTRUKSI_KANTORKU (baris pertama = judul, sisanya = langkah). */
+function htmlInstruksiKantorku_(nomor) {
+  const baris = String(param_().INSTRUKSI_KANTORKU || INSTRUKSI_KANTORKU_DEFAULT).split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  if (!baris.length) return '';
+  const judul = baris.shift();
+  return '<div class="instruksi"><b>📱 ' + escH_(judul) + '</b>' +
+    (baris.length ? '<ol>' + baris.map(x => '<li>' + escH_(x) + '</li>').join('') + '</ol>' : '') +
+    (nomor ? '<div class="no">Nomor SPL: <b>' + escH_(nomor) + '</b></div>' : '') + '</div>';
+}
+
 /* ======================= 1. Email konfirmasi ======================= */
 function kirimKonfirmasi_(jenis, nomor) {
   const J = JENIS[jenis], S = bacaBaris_(jenis), K = karyawan_();
@@ -1051,6 +1070,7 @@ function halamanAksi_(p) {
     if (tipe === 't') isi += '<p class="sub">Karyawan telah menyatakan <b>BERSEDIA</b>' + (r['Konfirmasi Pada'] instanceof Date ? ' pada ' + waktuIndo_(r['Konfirmasi Pada']) : '') + '.</p>';
     if (sudah) {
       isi += '<div class="msg info">Sudah diproses — status saat ini: <b>' + escH_(r['Status']) + '</b>.</div>';
+      if (jenis === 'SPL' && tipe === 'k' && [ST.ATASAN, ST.SETUJU].indexOf(r['Status']) >= 0) isi += htmlInstruksiKantorku_(r['Nomor SPL']);
     } else {
       const ya = tipe === 'k' ? 'Bersedia' : 'Setujui', tidak = tipe === 'k' ? 'Tidak Bersedia' : 'Tolak';
       const pil = p.p === 'tidak' ? 'tidak' : 'ya';
@@ -1077,6 +1097,8 @@ function halamanAksi_(p) {
     '.op.ya:has(input:checked){border-color:#1E7B4A;background:#E7F5EC}.op.tidak:has(input:checked){border-color:#B42318;background:#FDECEA}' +
     'label{display:block;font-weight:bold;font-size:12px;color:#6B6F76;margin-bottom:4px}textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid #CBCED4;border-radius:6px}' +
     'button{margin-top:12px;background:#BE353F;color:#fff;border:0;border-radius:8px;padding:12px 26px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{background:#B9BCC2}' +
+    '.instruksi{margin-top:14px;padding:14px 16px;border:1px solid #F3C9CC;background:#FFF7F7;border-radius:10px;font-size:14px;line-height:1.5}' +
+    '.instruksi ol{margin:8px 0 0 18px;padding:0}.instruksi li{margin:4px 0}.instruksi .no{margin-top:8px;font-size:13px;color:#555}' +
     '.msg{padding:12px;border-radius:8px;margin-top:14px}.ok{background:#E7F5EC;color:#1E7B4A}.err{background:#FDECEA;color:#B42318}.info{background:#EFF0F2}' +
     '</style></head><body><header><img src="' + LOGO_DATA_URI + '" alt="PT Citra Banjar Abadi"></header><main><div class="card">' + isi + '</div></main></body></html>';
   return HtmlService.createHtmlOutput(html).setTitle('SPL & SPD — PT Citra Banjar Abadi')
@@ -1121,7 +1143,8 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
         const err = kirimEmail_(ke, 'Persetujuan ' + J.kata + ' — ' + r['Full Name'] + ' (' + tgl + ')', isi);
         ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke });
         logAksi_(jenis, nomor, 'BERSEDIA', r['Full Name'], 'Diteruskan ke ' + ke);
-        pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(atasan.nama) + ')' : 'admin') + ' untuk persetujuan.';
+        pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(atasan.nama) + ')' : 'admin') + ' untuk persetujuan.' +
+          (jenis === 'SPL' ? '</div>' + htmlInstruksiKantorku_(nomor) + '<div>' : '');
       }
     } else {
       if (r['Status'] !== ST.ATASAN) return 'Sudah diproses sebelumnya — status: ' + r['Status'];
