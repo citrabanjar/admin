@@ -997,7 +997,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
     ['Jam Efektif', String(r['Jam Efektif']).replace('.', ',') + ' jam'],
     ['Uraian Pekerjaan', r['Uraian Pekerjaan']]
   ].concat(denganKompensasi ? [['Estimasi Kompensasi', rpH_(r['Estimasi Kompensasi'])]] : [], [
-    ['Diperintahkan oleh', r['Dibuat Oleh']]
+    ['Diperintahkan oleh', namaAtasan_(r['Employee ID']) || r['Dibuat Oleh']]
   ]) : [
     ['Nomor SPD', r['Nomor SPD']],
     ['Maksud / Tujuan', I['Maksud / Tujuan']],
@@ -1008,7 +1008,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
     ['Uang Saku', rpH_(r['Uang Saku'])],
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
-    ['Diperintahkan oleh', I['Dibuat Oleh']]
+    ['Diperintahkan oleh', namaAtasan_(r['Employee ID']) || I['Dibuat Oleh']]
   ];
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b =>
     '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' + escH_(b[0]) +
@@ -1151,6 +1151,11 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
   return pesan;
 }
 
+/** Nama atasan langsung (tanpa jabatan) — dipakai untuk "Diperintahkan oleh". Kosong bila atasan belum diisi. */
+function namaAtasan_(employeeId) {
+  const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
+  return k && k.atasan && K[k.atasan] ? K[k.atasan].nama : '';
+}
 /** Atasan langsung dari kolom "Atasan" (Employee ID). */
 function cariAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
