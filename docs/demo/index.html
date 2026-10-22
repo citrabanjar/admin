@@ -661,8 +661,8 @@ function splData() {
 function splKonfirmasi() {
   hitungSPL(); if (!SPL_OK) return;
   const d = splData(), t = keTanggal_(d.tanggal);
-  modal('<h3 style="margin-top:0">Kirim SPL?</h3><p>Tanggal <b>' + NAMA_HARI[hariKe_(t) - 1] + ', ' + tglPanjang(d.tanggal) + '</b><br><b>' + d.baris.length +
-    '</b> karyawan · <b>' + $('lTot').textContent + '</b> jam lembur</p><p class="sub">Setelah dikirim, SPL masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+  modal('<h3 style="margin-top:0">Kirim Surat Perintah Lembur</h3><p><b>' + NAMA_HARI[hariKe_(t) - 1] + ', ' + tglPanjang(d.tanggal) + '</b><br>' +
+    'Total karyawan yang akan lembur <b>' + d.baris.length + ' karyawan</b></p><p class="sub">Setelah dikirim, SPL masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="splKirim()">Ya, kirim</button></div>');
 }
 async function splKirim() {
