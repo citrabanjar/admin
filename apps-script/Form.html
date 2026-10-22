@@ -52,6 +52,16 @@
   .sub{font-size:11px;color:var(--mute);margin-top:3px}
   .rowerr{font-size:12px;color:var(--err);margin-top:4px}
   .rowwarn{font-size:12px;color:var(--warn);margin-top:4px}
+  .ac{position:relative}
+  .acl{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #CBCED4;border-radius:8px;box-shadow:0 8px 24px rgba(0,0,0,.12);max-height:280px;overflow:auto;margin-top:2px}
+  .aci{padding:8px 10px;cursor:pointer;border-bottom:1px solid #F0F1F3}
+  .aci:last-child{border-bottom:0}
+  .aci.on,.aci:hover{background:#FBEDEE}
+  .aci b{color:var(--ink)} .aci small{display:block;color:var(--mute);font-size:11px;margin-top:2px}
+  .aci mark{background:#FFE38A;padding:0}
+  .acx{padding:10px;color:var(--mute);font-size:12px}
+  input.kq.ok{background:#F2FAF5;border-color:#9ED3B4}
+  select:disabled{background:#EFF0F2;color:#999}
   .del{background:none;border:0;color:var(--err);font-size:18px;cursor:pointer;padding:6px}
   tfoot td{font-weight:bold;background:#EFF0F2;padding:10px 6px}
   .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}
@@ -133,8 +143,6 @@
   <div id="vApp" class="hide">
     <div class="nav">
       <button data-p="home" onclick="buka('home')">🏠 Beranda</button>
-      <button data-p="spl" onclick="buka('spl')">Surat Perintah Lembur</button>
-      <button data-p="spd" onclick="buka('spd')">Surat Perintah Dinas</button>
       <button data-p="riwayat" onclick="buka('riwayat')">Riwayat Saya</button>
     </div>
 
@@ -171,7 +179,7 @@
         </div>
         <div id="lInfo"></div>
       </div>
-      <div class="card" style="padding:0;overflow:auto">
+      <div class="card" style="padding:0">
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Jam Mulai</th><th>Jam Selesai</th>
             <th>Istirahat</th><th>Jam Efektif</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
@@ -225,7 +233,7 @@
           <div><label>Uang Saku / Orang</label><div class="chip" id="dSaku">–</div></div>
         </div>
       </div>
-      <div class="card" style="padding:0;overflow:auto">
+      <div class="card" style="padding:0">
         <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan <span class="sub">(maks. <span id="dMaks">5</span> orang — bila lebih, buat SPD baru)</span></div>
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Lama (hari)</th><th>Uang Saku</th><th style="min-width:180px">Keterangan</th><th></th></tr></thead>
@@ -234,7 +242,7 @@
         </table>
         <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="spdTambahPersonel()">+ Tambah personel</button></div>
       </div>
-      <div class="card" style="padding:0;overflow:auto">
+      <div class="card" style="padding:0">
         <div class="sek" style="padding:14px 16px 0">D. Biaya Perjalanan Dinas Lainnya</div>
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:170px">Jenis Biaya</th><th style="min-width:200px">Uraian</th><th style="min-width:130px">Jumlah (Rp)</th><th>Bukti</th><th></th></tr></thead>
@@ -297,15 +305,85 @@ function tutupModal() { $('modal').classList.add('hide'); }
 function opsi(daftar, pilih, kosong) {
   return (kosong ? '<option value="">' + kosong + '</option>' : '') + daftar.map(v => '<option' + (v === pilih ? ' selected' : '') + '>' + esc(v) + '</option>').join('');
 }
-function opsiKaryawan(pilih) {
-  let h = '<option value="">— pilih karyawan —</option>', dep = null;
-  D.karyawan.forEach(k => {
-    if (k.departemen !== dep) { if (dep !== null) h += '</optgroup>'; dep = k.departemen; h += '<optgroup label="' + esc(dep) + '">'; }
-    h += '<option value="' + esc(k.id) + '"' + (k.id === pilih ? ' selected' : '') + '>' + esc(k.id + ' — ' + k.nama) + '</option>';
-  });
-  return h + '</optgroup>';
-}
 const kar = id => D.karyawan.find(x => x.id === id);
+
+/* ===== kotak cari karyawan (ketik nama / ID, sistem membantu mencari) ===== */
+function htmlCariKaryawan(onPilih) {
+  return '<div class="ac"><input class="kq" placeholder="Ketik nama / ID karyawan…" autocomplete="off" ' +
+    'oninput="acCari(this)" onfocus="acCari(this)" onkeydown="acKey(event,this)" onblur="acTutup(this)" data-cb="' + onPilih + '">' +
+    '<input type="hidden" class="k"><div class="acl hide"></div></div>';
+}
+function acNorm(x) { return String(x || '').toLowerCase(); }
+function acCari(inp) {
+  const box = inp.parentNode, list = box.querySelector('.acl'), hid = box.querySelector('.k');
+  if (hid.value && inp.value !== inp.dataset.label) { hid.value = ''; inp.classList.remove('ok'); window[inp.dataset.cb](); }
+  const q = acNorm(inp.value).trim(), kata = q.split(/\s+/).filter(Boolean);
+  // karyawan yang sudah dipilih di baris lain tidak ditampilkan lagi
+  const tabel = inp.closest('tbody'), dipakai = {};
+  tabel.querySelectorAll('.k').forEach(h => { if (h !== hid && h.value) dipakai[h.value] = 1; });
+  const hasil = D.karyawan.filter(k => !dipakai[k.id] && kata.every(w => acNorm(k.id + ' ' + k.nama + ' ' + k.jabatan + ' ' + k.departemen).indexOf(w) >= 0))
+    .sort((a, b) => (acNorm(a.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) - (acNorm(b.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) || a.nama.localeCompare(b.nama))
+    .slice(0, 8);
+  const tandai = t => { let h = esc(t); kata.forEach(w => { if (w) h = h.replace(new RegExp('(' + w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'ig'), '<mark>$1</mark>'); }); return h; };
+  list.innerHTML = hasil.length ? hasil.map((k, i) => '<div class="aci' + (i === 0 ? ' on' : '') + '" data-id="' + esc(k.id) + '" onmousedown="event.preventDefault();acPilih(this)">' +
+    '<b>' + tandai(k.nama) + '</b> · ' + tandai(k.id) + '<small>' + tandai(k.jabatan) + ' · ' + esc(k.departemen) + '</small></div>').join('')
+    : '<div class="acx">' + (q ? 'Tidak ditemukan "' + esc(inp.value) + '"' : 'Ketik nama atau ID karyawan') + '</div>';
+  list.classList.remove('hide');
+}
+function acPilih(item) {
+  const box = item.closest('.ac'), inp = box.querySelector('.kq'), k = kar(item.dataset.id);
+  box.querySelector('.k').value = k.id;
+  inp.value = inp.dataset.label = k.nama + ' (' + k.id + ')';
+  inp.classList.add('ok');
+  box.querySelector('.acl').classList.add('hide');
+  window[inp.dataset.cb]();
+}
+function acKey(ev, inp) {
+  const list = inp.parentNode.querySelector('.acl'), it = [].slice.call(list.querySelectorAll('.aci'));
+  if (list.classList.contains('hide') || !it.length) return;
+  let i = it.findIndex(x => x.classList.contains('on'));
+  if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') {
+    ev.preventDefault(); if (i >= 0) it[i].classList.remove('on');
+    i = ev.key === 'ArrowDown' ? Math.min(i + 1, it.length - 1) : Math.max(i - 1, 0);
+    it[i].classList.add('on'); it[i].scrollIntoView({ block: 'nearest' });
+  } else if (ev.key === 'Enter') { ev.preventDefault(); acPilih(it[Math.max(i, 0)]); }
+  else if (ev.key === 'Escape') list.classList.add('hide');
+}
+function acTutup(inp) {
+  setTimeout(() => {
+    const box = inp.parentNode, list = box.querySelector('.acl'), it = list.querySelectorAll('.aci');
+    // hanya satu hasil yang cocok → langsung dipilih
+    if (!box.querySelector('.k').value && inp.value.trim() && it.length === 1) acPilih(it[0]);
+    list.classList.add('hide');
+  }, 150);
+}
+function acKosongkan(el) { const i = el.querySelector('.kq'); i.value = ''; i.dataset.label = ''; i.classList.remove('ok'); el.querySelector('.k').value = ''; }
+
+/* ===== pilihan jam mengikuti batasan ===== */
+function jamMinMaks() {
+  const t = keTanggal_($('lTgl').value);
+  if (!t) return null;
+  const st = statusHari_(t, D.libur), hk = hariKe_(t);
+  const min = jamKeAngka_(st === 'Hari Libur' ? D.P.JAM_MULAI_MIN_LIBUR : hk === 6 ? D.P.JAM_MULAI_MIN_SABTU : D.P.JAM_MULAI_MIN_SENJUM);
+  return { min: min, maks: jamKeAngka_(D.P.JAM_SELESAI_MAKS) };
+}
+function isiJam(sel, daftar, kosong) {
+  const kunci = daftar.join(',') + '|' + kosong;
+  const v = sel.value;
+  if (sel.dataset.k !== kunci) {
+    sel.innerHTML = '<option value="">' + kosong + '</option>' + daftar.map(j => '<option>' + j + '</option>').join('');
+    sel.dataset.k = kunci;
+  }
+  sel.value = daftar.indexOf(v) >= 0 ? v : '';
+  sel.disabled = !daftar.length;
+}
+function aturJamBaris(el) {
+  const b = jamMinMaks(), m = el.querySelector('.m'), s = el.querySelector('.s');
+  if (!b) { isiJam(m, [], 'isi tanggal dulu'); isiJam(s, [], 'isi tanggal dulu'); return; }
+  isiJam(m, D.jam.filter(j => { const h = jamKeAngka_(j); return h >= b.min && h < b.maks; }), '--:--');
+  const mm = jamKeAngka_(m.value);
+  isiJam(s, mm === null ? [] : D.jam.filter(j => { const h = jamKeAngka_(j); return h > mm && h <= b.maks; }), mm === null ? 'pilih jam mulai' : '--:--');
+}
 
 /* ===== login ===== */
 async function mulai() {
@@ -369,25 +447,28 @@ function splTambah() {
   const maks = Number(D.P.MAKS_KARYAWAN_PER_SPL) || 30;
   if (LROWS.length >= maks) { alert('Maksimal ' + maks + ' karyawan per SPL.'); return; }
   const prev = LROWS[LROWS.length - 1], id = ++uid;
-  const jamOps = v => '<option value="">--:--</option>' + D.jam.map(j => '<option' + (j === v ? ' selected' : '') + '>' + j + '</option>').join('');
   const tr = document.createElement('tr'); tr.id = 'l' + id;
   tr.innerHTML =
     '<td class="n"></td>' +
-    '<td data-l="Karyawan"><select class="k" onchange="hitungSPL()">' + opsiKaryawan('') + '</select><div class="sub jab"></div><div class="rowerr"></div><div class="rowwarn"></div></td>' +
-    '<td class="half" data-l="Jam Mulai"><select class="m" onchange="hitungSPL()">' + jamOps(prev ? prev.el.querySelector('.m').value : '') + '</select></td>' +
-    '<td class="half" data-l="Jam Selesai"><select class="s" onchange="hitungSPL()">' + jamOps(prev ? prev.el.querySelector('.s').value : '') + '</select></td>' +
+    '<td data-l="Karyawan">' + htmlCariKaryawan('hitungSPL') + '<div class="sub jab"></div><div class="rowerr"></div><div class="rowwarn"></div></td>' +
+    '<td class="half" data-l="Jam Mulai"><select class="m" onchange="hitungSPL()"></select></td>' +
+    '<td class="half" data-l="Jam Selesai"><select class="s" onchange="hitungSPL()"></select></td>' +
     '<td class="auto ist" data-l="Istirahat">-</td><td class="auto ef" data-l="Jam Efektif">-</td>' +
     '<td data-l="Uraian Pekerjaan"><textarea class="u" rows="2" placeholder="Contoh: Welding frame project X" oninput="hitungSPL()"></textarea></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="splHapus(' + id + ')">✕</button></td>';
-  $('lRows').appendChild(tr); LROWS.push({ id: id, el: tr }); hitungSPL();
+  $('lRows').appendChild(tr); LROWS.push({ id: id, el: tr });
+  aturJamBaris(tr);
+  if (prev) { tr.querySelector('.m').value = prev.el.querySelector('.m').value; aturJamBaris(tr); tr.querySelector('.s').value = prev.el.querySelector('.s').value; }
+  hitungSPL();
+  tr.querySelector('.kq').focus();
 }
 function splHapus(id) {
-  if (LROWS.length === 1) { const r = LROWS[0].el; r.querySelector('.k').value = ''; r.querySelector('.u').value = ''; hitungSPL(); return; }
+  if (LROWS.length === 1) { const r = LROWS[0].el; acKosongkan(r); r.querySelector('.u').value = ''; hitungSPL(); return; }
   LROWS = LROWS.filter(r => r.id !== id); $('l' + id).remove(); hitungSPL();
 }
 function splSamakan() {
   const a = LROWS[0].el, m = a.querySelector('.m').value, s = a.querySelector('.s').value, u = a.querySelector('.u').value;
-  LROWS.slice(1).forEach(r => { r.el.querySelector('.m').value = m; r.el.querySelector('.s').value = s; if (!r.el.querySelector('.u').value.trim()) r.el.querySelector('.u').value = u; });
+  LROWS.slice(1).forEach(r => { r.el.querySelector('.m').value = m; aturJamBaris(r.el); r.el.querySelector('.s').value = s; if (!r.el.querySelector('.u').value.trim()) r.el.querySelector('.u').value = u; });
   hitungSPL();
 }
 function hitungSPL() {
@@ -401,10 +482,12 @@ function hitungSPL() {
   } else { $('lHari').textContent = $('lStatus').textContent = $('lMin').textContent = '–'; $('lStatus').className = 'chip'; }
   let tot = 0, orang = 0, adaErr = false; const dipakai = {}, warnUU = [];
   LROWS.forEach((r, i) => {
+    aturJamBaris(r.el);
     const el = r.el, id = el.querySelector('.k').value, m = el.querySelector('.m').value, s = el.querySelector('.s').value, u = el.querySelector('.u').value.trim();
     el.querySelector('.n').textContent = i + 1;
     const k = kar(id); el.querySelector('.jab').textContent = k ? k.jabatan + ' · ' + k.departemen : '';
     const e = [], w = []; let h = null;
+    if (!id && el.querySelector('.kq').value.trim()) e.push('Pilih karyawan dari daftar saran.');
     if (id) {
       orang++;
       if (dipakai[id]) e.push('Karyawan ini sudah ada di baris ' + dipakai[id] + '.'); else dipakai[id] = i + 1;
@@ -467,7 +550,7 @@ function spdTambahPersonel() {
   const id = ++uid, tr = document.createElement('tr'); tr.id = 'p' + id;
   tr.innerHTML =
     '<td class="n"></td>' +
-    '<td data-l="Karyawan"><select class="k" onchange="hitungSPD()">' + opsiKaryawan('') + '</select><div class="sub jab"></div><div class="rowerr"></div></td>' +
+    '<td data-l="Karyawan">' + htmlCariKaryawan('hitungSPD') + '<div class="sub jab"></div><div class="rowerr"></div></td>' +
     '<td class="half" data-l="Lama (hari)" style="width:110px"><input class="lm" type="number" min="1" step="1" oninput="this.dataset.manual=1;hitungSPD()"></td>' +
     '<td class="auto uang saku half" data-l="Uang Saku">-</td>' +
     '<td data-l="Keterangan"><input class="ket" placeholder="opsional"></td>' +
@@ -475,7 +558,7 @@ function spdTambahPersonel() {
   $('pRows').appendChild(tr); PROWS.push({ id: id, el: tr }); hitungSPD();
 }
 function spdHapusPersonel(id) {
-  if (PROWS.length === 1) { const r = PROWS[0].el; r.querySelector('.k').value = ''; r.querySelector('.ket').value = ''; hitungSPD(); return; }
+  if (PROWS.length === 1) { const r = PROWS[0].el; acKosongkan(r); r.querySelector('.ket').value = ''; hitungSPD(); return; }
   PROWS = PROWS.filter(r => r.id !== id); $('p' + id).remove(); hitungSPD();
 }
 function spdTambahBiaya() {
