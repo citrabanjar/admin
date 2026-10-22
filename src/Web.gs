@@ -28,7 +28,7 @@ function doGet(e) {
 
 /** Menu spreadsheet: tampilkan link form */
 function bukaForm() {
-  const url = ScriptApp.getService().getUrl();
+  const url = String(param_().URL_WEB_APP || '').trim() || ScriptApp.getService().getUrl();
   const ui = SpreadsheetApp.getUi();
   if (!url) { ui.alert('Form belum di-deploy.\n\nDeploy → New deployment → Web app (lihat panduan).'); return; }
   ui.showModalDialog(HtmlService.createHtmlOutput(

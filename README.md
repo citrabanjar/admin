@@ -18,7 +18,8 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 | `src/Form.html` | Tampilan form |
 | `src/appsscript.json` | Manifest (zona waktu Asia/Jakarta, Web App: execute as owner, akses Anyone) |
 | `manual/Kode_Lengkap.gs` | Semua .gs digabung — cadangan bila perlu tempel manual |
-| `docs/` | Demo tampilan (GitHub Pages, data fiktif) |
+| `docs/index.html` | **Pintu masuk form** di https://citrabanjar.github.io/admin/ (memuat Web App Apps Script) |
+| `docs/demo/` | Demo tampilan (data fiktif) |
 | `.github/workflows/deploy-apps-script.yml` | Otomatis `clasp push` + update deployment |
 
 ## Deploy otomatis (GitHub → Apps Script)

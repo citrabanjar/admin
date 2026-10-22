@@ -60,6 +60,12 @@ function setupAwal() {
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
+  // Parameter tambahan (dibuat bila belum ada)
+  const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
+  [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).']]
+    .forEach(r => { if (adaP.indexOf(r[0]) < 0) shP.appendRow(r); });
+  _P = null;
+
   // Kolom tambahan Data SPL untuk alur email
   pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
   pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
