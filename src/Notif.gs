@@ -18,7 +18,7 @@ const ST = {
   SETUJU: 'DISETUJUI', TOLAK: 'DITOLAK', BATAL: 'DIBATALKAN'
 };
 const ST_FINAL = [ST.TIDAK, ST.SETUJU, ST.TOLAK, ST.BATAL];
-const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'KantorKu'];
+const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'KantorKu'];
 const KOLOM_SPD_TAMBAHAN = ['Status', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Atasan', 'Email Atasan',
   'Disetujui Oleh', 'Disetujui Pada', 'Catatan Atasan', 'Status Email', 'ID Baris'];
 
@@ -286,19 +286,25 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
 /** Nama atasan langsung (tanpa jabatan) — dipakai untuk "Diperintahkan oleh". Kosong bila atasan belum diisi. */
 function namaAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
-  return k && k.atasan && K[k.atasan] ? K[k.atasan].nama : '';
+  const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
+  return a ? a.nama : '';
+}
+/** Owner (BOSS): karyawan aktif ber-email dengan Peran = BOSS atau Employee ID = BOSS */
+function owner_() {
+  return Object.values(karyawan_()).filter(k => k.aktif && k.email && (k.peran === 'BOSS' || k.id === 'BOSS'));
 }
 /** Atasan langsung dari kolom "Atasan" (Employee ID). */
 function cariAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
   if (!k || !k.atasan) return null;
-  const a = K[k.atasan];
+  const a = K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null);
   return a && a.email && a.aktif ? a : null;
 }
 
 /* ======================= 4. PDF ke admin ======================= */
 /** Bila semua orang di surat sudah final & PDF belum dibuat → buat PDF & kirim ke admin. */
 function cekSelesai_(jenis, nomor, paksa) {
+  if (jenis === 'SPL') return rekapSPL_(nomor, paksa);
   const J = JENIS[jenis], S = bacaBaris_(jenis), rows = S.rows.filter(r => r[J.kunci] === nomor);
   if (!rows.length) return 'Nomor ' + nomor + ' tidak ditemukan.';
   const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0);
@@ -329,6 +335,75 @@ function cekSelesai_(jenis, nomor, paksa) {
 }
 function cekSelesaiSPL_(nomor, paksa) { return cekSelesai_('SPL', nomor, paksa); }
 
+/** Pindahkan file PDF lama (dari link) ke sampah Drive */
+function hapusPdfLama_(url) {
+  const m = String(url || '').match(/\/d\/([\w-]{20,})/);
+  if (!m) return false;
+  try { DriveApp.getFileById(m[1]).setTrashed(true); return true; } catch (e) { return false; }
+}
+
+/**
+ * Rekap PDF Surat Perintah Lembur per TANGGAL LEMBUR.
+ *  - Admin : rekap semua surat yang DIA input pada tanggal itu (tanpa estimasi kompensasi).
+ *  - Owner : rekap semua surat dari seluruh admin pada tanggal itu (dengan estimasi kompensasi).
+ *  PDF dibuat setelah semua karyawan di rekap itu selesai diproses. Bila ada surat susulan di
+ *  tanggal yang sama setelah PDF terbentuk, PDF lama dihapus & PDF baru dibuat + dikirim ulang.
+ */
+function rekapSPL_(nomor, paksa) {
+  const S = bacaBaris_('SPL');
+  const r0 = S.rows.find(r => r['Nomor SPL'] === nomor);
+  if (!r0) return 'Nomor ' + nomor + ' tidak ditemukan.';
+  const tgl = r0['Tanggal Lembur'] instanceof Date ? ymd_(r0['Tanggal Lembur']) : '';
+  const hari = S.rows.filter(r => r['Tanggal Lembur'] instanceof Date && ymd_(r['Tanggal Lembur']) === tgl);
+  const fin = rows => rows.every(r => ST_FINAL.indexOf(r['Status']) >= 0);
+  const hasil = [];
+
+  // 1. rekap admin pembuat surat ini
+  const em = String(r0['Email Pembuat']).toLowerCase();
+  const milik = hari.filter(r => String(r['Email Pembuat']).toLowerCase() === em);
+  if (paksa || (fin(milik) && milik.some(r => !r['Link PDF']))) {
+    const lama = [...new Set(milik.map(r => r['Link PDF']).filter(Boolean))];
+    const pdf = buatPdfSPL_(milik, { estimasi: false, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - ' + r0['Dibuat Oleh'] });
+    const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
+    lama.forEach(hapusPdfLama_);
+    milik.forEach(r => ubahBaris_(S, r._row, { 'Link PDF': file.getUrl() }));
+    kirimRekap_(em, milik, file, pdf, lama.length > 0, false);
+    logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ADMIN DIPERBARUI' : 'PDF REKAP ADMIN', em, file.getUrl());
+    hasil.push('PDF rekap dikirim ke ' + em);
+  }
+
+  // 2. rekap owner (semua admin) — setelah seluruh surat di tanggal itu selesai
+  const own = owner_();
+  if (own.length && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
+    const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
+    const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
+    const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
+    lama.forEach(hapusPdfLama_);
+    hari.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Owner': file.getUrl() }));
+    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, true);
+    logAksi_('SPL', nomor, lama.length ? 'PDF REKAP OWNER DIPERBARUI' : 'PDF REKAP OWNER', own.map(o => o.email).join(','), file.getUrl());
+    hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
+  }
+  return hasil.join('\n');
+}
+function tglFile_(r) { return Utilities.formatDate(r['Tanggal Lembur'], TZ, 'dd-MM-yyyy'); }
+
+function kirimRekap_(ke, rows, file, pdf, revisi, owner) {
+  const r0 = rows[0], ok = rows.filter(r => r['Status'] === ST.SETUJU);
+  const tgl = r0['Hari'] + ', ' + tglIndo_(r0['Tanggal Lembur']);
+  const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
+  const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length;
+  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (owner ? ' — seluruh admin' : '') + '.</p>' +
+    (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> karena ada Surat Perintah Lembur susulan di tanggal yang sama. ' +
+      'Laporan sebelumnya sudah dihapus — gunakan PDF terbaru ini.</p>' : '') +
+    '<p>' + nomor.length + ' surat (' + nomor.map(escH_).join(', ') + ')<br>' +
+    ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> lembur, total ' + String(ok.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0)).replace('.', ',') + ' jam' +
+    (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
+    (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
+    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
+  return kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (owner ? ' (Semua Admin)' : ''), isi, '', pdf);
+}
+
 function folderPdf_(nama) {
   const parent = DriveApp.getFileById(ss_().getId()).getParents();
   const induk = parent.hasNext() ? parent.next() : DriveApp.getRootFolder();
@@ -355,8 +430,14 @@ function pdfDari_(html, nama) {
   return HtmlService.createHtmlOutput(html).getBlob().getAs('application/pdf').setName(nama);
 }
 
-function buatPdfSPL_(rows) {
+function buatPdfSPL_(rows, opt) {
+  opt = opt || { estimasi: false };
+  rows = rows.slice().sort((x, y) => String(x['Nomor SPL']).localeCompare(String(y['Nomor SPL'])) || x._row - y._row);
   const r0 = rows[0], P = param_();
+  const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
+  const admin = [...new Set(rows.map(r => r['Dibuat Oleh']))];
+  const banyak = nomor.length > 1, kolAdmin = !!opt.owner && admin.length > 1;
+  const noSurat = r => String(r['Nomor SPL']).split('/')[0].trim();
   const tidak = rows.filter(r => r['Status'] === ST.TIDAK);
   const bersedia = rows.filter(r => r['Status'] !== ST.TIDAK);
   const setuju = bersedia.filter(r => r['Status'] === ST.SETUJU);
@@ -372,18 +453,23 @@ function buatPdfSPL_(rows) {
         '<br><span style="color:#777">' + waktuIndo_(r['Disetujui Pada']) + '</span>' + (r['Catatan Atasan'] ? '<br><i>' + escH_(r['Catatan Atasan']) + '</i>' : '');
     return '<b style="color:#9A6200">' + escH_(r['Status']) + '</b>';
   };
+  // kolom awal yang sama untuk tabel A & B
+  const headAwal = ['No'].concat(banyak ? ['No. Surat'] : [], kolAdmin ? ['Diinput oleh'] : [], ['Employee ID', 'Full Name']);
+  const selAwal = (r, i) => tdP_(i + 1, 'text-align:center') + (banyak ? tdP_(escH_(noSurat(r)), 'text-align:center') : '') +
+    (kolAdmin ? tdP_(escH_(r['Dibuat Oleh'])) : '') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>');
 
   // A. Karyawan yang bersedia lembur
   let html = judulTabel('A. KARYAWAN YANG BERSEDIA LEMBUR (' + bersedia.length + ' orang)');
   if (bersedia.length) {
     html += '<table style="border-collapse:collapse;width:100%"><tr>' +
-      ['No', 'Employee ID', 'Full Name', 'Mulai', 'Selesai', 'Istirahat', 'Jam Efektif', 'Estimasi Kompensasi', 'Uraian Pekerjaan', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' +
-      bersedia.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
+      headAwal.concat(['Mulai', 'Selesai', 'Istirahat', 'Jam Efektif'], opt.estimasi ? ['Estimasi Kompensasi'] : [], ['Uraian Pekerjaan', 'Persetujuan Atasan']).map(thP_).join('') + '</tr>' +
+      bersedia.map((r, i) => '<tr>' + selAwal(r, i) +
         tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
-        tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') + tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') +
+        tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') +
+        (opt.estimasi ? tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') : '') +
         tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(persetujuan(r)) + '</tr>').join('') +
-      tot('TOTAL LEMBUR DISETUJUI (' + setuju.length + ' dari ' + bersedia.length + ' karyawan)', 6,
-        [[String(totJam).replace('.', ','), 'center'], [rpH_(totKomp), 'right']], 2) + '</table>';
+      tot('TOTAL LEMBUR DISETUJUI (' + setuju.length + ' dari ' + bersedia.length + ' karyawan)', headAwal.length + 3,
+        [[String(totJam).replace('.', ','), 'center']].concat(opt.estimasi ? [[rpH_(totKomp), 'right']] : []), 2) + '</table>';
   } else {
     html += '<div style="font-size:9px;color:#777">Tidak ada karyawan yang bersedia lembur.</div>';
   }
@@ -392,20 +478,23 @@ function buatPdfSPL_(rows) {
   if (tidak.length) {
     html += judulTabel('B. KARYAWAN YANG TIDAK BERSEDIA LEMBUR (' + tidak.length + ' orang)') +
       '<table style="border-collapse:collapse;width:100%"><tr>' +
-      ['No', 'Employee ID', 'Full Name', 'Rencana Jam', 'Uraian Pekerjaan', 'Alasan Tidak Bersedia', 'Waktu Konfirmasi'].map(thP_).join('') + '</tr>' +
-      tidak.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
+      headAwal.concat(['Rencana Jam', 'Uraian Pekerjaan', 'Alasan Tidak Bersedia', 'Waktu Konfirmasi']).map(thP_).join('') + '</tr>' +
+      tidak.map((r, i) => '<tr>' + selAwal(r, i) +
         tdP_(escH_(r['Jam Mulai']) + ' – ' + escH_(r['Jam Selesai']), 'text-align:center;white-space:nowrap') + tdP_(escH_(r['Uraian Pekerjaan'])) +
         tdP_(escH_(r['Alasan Tidak Bersedia'] || '-')) + tdP_(waktuIndo_(r['Konfirmasi Pada']) || '-') + '</tr>').join('') + '</table>';
   }
 
+  const daftarNomor = banyak ? nomor.map(n => escH_(noSurat({ 'Nomor SPL': n })) + ' = ' + escH_(n)).join('<br>') : escH_(nomor[0]);
   const doc = '<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
-    kopPdf_('SURAT PERINTAH LEMBUR (SPL)', r0['Nomor SPL']) +
+    kopPdf_(banyak || opt.owner ? 'REKAP SURAT PERINTAH LEMBUR' : 'SURAT PERINTAH LEMBUR', banyak ? nomor.length + ' surat' : nomor[0]) +
     '<table style="font-size:10px;margin-bottom:4px"><tr><td style="width:110px">Tanggal Lembur</td><td>: <b>' + escH_(r0['Hari']) + ', ' + tglIndo_(r0['Tanggal Lembur']) + '</b></td></tr>' +
-    '<tr><td>Status Hari</td><td>: ' + escH_(r0['Status Hari']) + '</td></tr><tr><td>Dibuat oleh</td><td>: ' + escH_(r0['Dibuat Oleh']) + ' — ' + waktuIndo_(r0['Dibuat Pada']) + '</td></tr></table>' +
+    '<tr><td>Status Hari</td><td>: ' + escH_(r0['Status Hari']) + '</td></tr>' +
+    (banyak ? '<tr><td style="vertical-align:top">Nomor Surat</td><td>: ' + daftarNomor + '</td></tr>' : '') +
+    '<tr><td>Diinput oleh</td><td>: ' + admin.map(escH_).join(', ') + '</td></tr></table>' +
     html +
     '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL ' + escH_(P.NAMA_PERUSAHAAN || '') +
-    '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(r0['Dibuat Oleh'], 'Admin') + '</body></html>';
-  return pdfDari_(doc, 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(r0['Tanggal Lembur'], TZ, 'dd-MM-yyyy') + ').pdf');
+    '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(admin.join(', '), 'Admin') + '</body></html>';
+  return pdfDari_(doc, (opt.nama || 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + tglFile_(r0) + ')') + '.pdf');
 }
 function ttdPdf_(nama, jabatan) {
   return '<table style="width:100%;margin-top:18px;font-size:10px;text-align:center"><tr><td>Dibuat oleh,</td><td>Diketahui oleh,</td><td>Disetujui oleh,</td></tr>' +

@@ -32,6 +32,7 @@ function simpanSPL(token, data) {
       const id = String(b.id).trim().toUpperCase(), no = 'Baris ' + (i + 1) + ': ';
       const k = K[id];
       if (!k || !k.aktif) { err.push(no + 'Employee ID ' + id + ' tidak ditemukan / tidak aktif.'); return null; }
+      if (id === String(u.id).toUpperCase()) err.push(no + 'Anda tidak bisa memasukkan diri sendiri — Surat Perintah Lembur untuk Anda harus diinput oleh admin lain.');
       if (sudah[id]) err.push(no + k.nama + ' tercantum lebih dari sekali.');
       sudah[id] = true;
       if (!String(b.uraian || '').trim()) err.push(no + 'Uraian pekerjaan ' + k.nama + ' wajib diisi.');

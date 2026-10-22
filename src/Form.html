@@ -392,6 +392,7 @@ function acCari(inp) {
   // karyawan yang sudah dipilih di baris lain tidak ditampilkan lagi
   const tabel = inp.closest('tbody'), dipakai = {};
   tabel.querySelectorAll('.k').forEach(h => { if (h !== hid && h.value) dipakai[h.value] = 1; });
+  if (tabel.id === 'lRows' && D.user.id) dipakai[D.user.id] = 1;   // admin tidak bisa memerintahkan lembur dirinya sendiri
   const hasil = D.karyawan.filter(k => !dipakai[k.id] && kata.every(w => acNorm(k.id + ' ' + k.nama + ' ' + k.jabatan + ' ' + k.departemen).indexOf(w) >= 0))
     .sort((a, b) => (acNorm(a.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) - (acNorm(b.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) || a.nama.localeCompare(b.nama))
     .slice(0, 8);

@@ -43,6 +43,8 @@ function apiData_(q) {
     if (q.api === 'laporan') return keluar(apiLaporan_(q));
     if (q.api === 'setuju') return keluar(apiSetuju_());
     if (q.api === 'tandai') return keluar(apiTandai_(q));
+    if (q.api === 'peran') return keluar({ ok: true, karyawan: Object.values(karyawan_()).filter(k => k.peran !== 'KARYAWAN' || k.atasan === 'BOSS' || k.id === 'BOSS')
+      .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
     return keluar({ ok: false, error: 'api tidak dikenal' });
   } catch (e) { return keluar({ ok: false, error: String(e.message || e) }); }
 }

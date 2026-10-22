@@ -43,7 +43,7 @@ function pembuatByEmail_(email) {
   const k = cariKaryawanByEmail_(email);
   return (k && k.aktif && PERAN_PEMBUAT.indexOf(k.peran) >= 0) ? k : null;
 }
-function infoUser_(k) { return { nama: k.nama, jabatan: k.jabatan, departemen: k.departemen, peran: k.peran, email: k.email }; }
+function infoUser_(k) { return { id: k.id, nama: k.nama, jabatan: k.jabatan, departemen: k.departemen, peran: k.peran, email: k.email }; }
 /** Sesi login disimpan di Script Properties (bertahan 30 hari, tidak hilang seperti cache). */
 function sesiBuat_(email) {
   const tok = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');

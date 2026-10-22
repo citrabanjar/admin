@@ -15,7 +15,7 @@ window.SERVER={
  loginOtomatis:()=>({token:null}),
  kirimKode:e=>{if(!/@/.test(e))throw new Error('Email tidak terdaftar sebagai pembuat surat. Hubungi Admin/HRD.');return 'Kode dikirim ke '+e.replace(/^(.{2}).*(@.*)$/,'$1•••$2')},
  verifikasiKode:(e,k)=>{if(String(k).trim()!=='123456')throw new Error('Kode salah.');return {token:'T1',user:{}}},
- dataForm:()=>({user:{nama:'AGUS PRIYANTO',jabatan:'FOREMAN',departemen:'PRODUCTION DEPARTEMENT',peran:'PEMBUAT'},
+ dataForm:()=>({user:{id:'K002',nama:'AGUS PRIYANTO',jabatan:'FOREMAN',departemen:'PRODUCTION DEPARTEMENT',peran:'PEMBUAT'},
    karyawan:[{id:'K001',nama:'BUDI SANTOSO',jabatan:'WELDER',departemen:'PRODUCTION DEPARTEMENT'},{id:'K002',nama:'AGUS PRIYANTO',jabatan:'FOREMAN',departemen:'PRODUCTION DEPARTEMENT'},{id:'K003',nama:'DEDI KURNIAWAN',jabatan:'HELPER',departemen:'PRODUCTION DEPARTEMENT'},{id:'K004',nama:'RINA MARLINA',jabatan:'STAFF',departemen:'ENGINEERING DEPARTEMENT'},{id:'K005',nama:'HENDRA WIJAYA',jabatan:'STAFF',departemen:'MARKETING DEPARTEMENT'},{id:'K006',nama:'DISUN MURDIYANTO',jabatan:'SUPERVISOR',departemen:'PRODUCTION DEPARTEMENT'}],
    libur:{'2026-12-25':'Hari Raya Natal'},
    P:{JAM_MULAI_MIN_SENJUM:'16:00',JAM_MULAI_MIN_SABTU:'13:00',JAM_MULAI_MIN_LIBUR:'08:00',JAM_SELESAI_MAKS:'24:00',ISTIRAHAT_HARI_KERJA:'18:00-19:00',ISTIRAHAT_HARI_LIBUR:'12:00-13:00',BATAS_SELESAI_LIBUR:'18:00',MAKS_KARYAWAN_PER_SPL:30,UANG_SAKU_HARI:100000,BATAS_LAMA_DINAS:14,MAKS_PERSONEL_SPD:5,NAMA_PERUSAHAAN:'PT Citra Banjar Abadi'},
@@ -521,6 +521,7 @@ function acCari(inp) {
   // karyawan yang sudah dipilih di baris lain tidak ditampilkan lagi
   const tabel = inp.closest('tbody'), dipakai = {};
   tabel.querySelectorAll('.k').forEach(h => { if (h !== hid && h.value) dipakai[h.value] = 1; });
+  if (tabel.id === 'lRows' && D.user.id) dipakai[D.user.id] = 1;   // admin tidak bisa memerintahkan lembur dirinya sendiri
   const hasil = D.karyawan.filter(k => !dipakai[k.id] && kata.every(w => acNorm(k.id + ' ' + k.nama + ' ' + k.jabatan + ' ' + k.departemen).indexOf(w) >= 0))
     .sort((a, b) => (acNorm(a.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) - (acNorm(b.nama).indexOf(kata[0] || '') === 0 ? 0 : 1) || a.nama.localeCompare(b.nama))
     .slice(0, 8);
