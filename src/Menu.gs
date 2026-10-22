@@ -63,7 +63,7 @@ function setupAwal() {
   // Parameter tambahan (dibuat bila belum ada)
   const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
   [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).'],
-   ['INSTRUKSI_KANTORKU', INSTRUKSI_KANTORKU_DEFAULT, 'Instruksi setelah karyawan klik Bersedia (halaman konfirmasi). Baris 1 = judul, baris berikutnya = langkah. Tekan Ctrl+Enter untuk baris baru di sel.']]
+   ['URL_KANTORKU', 'https://hris.kantorku.id', 'Link aplikasi KantorKu yang ditampilkan setelah karyawan klik Bersedia.']]
     .forEach(r => { if (adaP.indexOf(r[0]) < 0) shP.appendRow(r); });
   _P = null;
 
