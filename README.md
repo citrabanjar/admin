@@ -13,6 +13,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 | `Logo.gs` | Logo perusahaan (base64) untuk header form & kop surat PDF |
 | `Web.gs` | Web App: tampilan, login OTP email, data form, alur approval |
 | `Spl.gs` | Simpan & riwayat Surat Perintah Lembur |
+| `Notif.gs` | Email konfirmasi karyawan (Bersedia/Tidak), persetujuan atasan, PDF SPL ke admin |
 | `Spd.gs` | Simpan & riwayat Surat Perintah Dinas |
 | `Kode_Lengkap.gs` | Semua file .gs di atas digabung jadi satu (cukup tempel ini ke Code.gs) |
 | `Form.html` | Tampilan form (Beranda · SPL · SPD · Riwayat) |
@@ -27,6 +28,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 ## Tahapan
 - [x] Tahap 1 — Database & script inti
 - [x] Tahap 2–3 — Form SPL & SPD (logo perusahaan), nomor otomatis, simpan
-- [ ] Tahap 4 — Email notifikasi & approval Manager / HRD
-- [ ] Tahap 5 — Cetak PDF surat (kop surat dengan logo)
+- [x] Tahap 4 — Email SPL: konfirmasi karyawan → persetujuan atasan langsung → PDF ke admin
+- [x] Tahap 5 — PDF SPL dengan kop surat (otomatis saat semua karyawan selesai diproses)
+- [ ] Email & PDF untuk SPD
 - [ ] Tahap 6 — Panel admin & rekap

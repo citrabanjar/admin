@@ -64,6 +64,9 @@
   .st{display:inline-block;font-size:11px;font-weight:bold;padding:3px 8px;border-radius:10px;background:#EFF0F2;white-space:nowrap}
   .st.MENUNGGU{background:var(--warnbg);color:var(--warn)} .st.DISETUJUI{background:var(--okbg);color:var(--ok)}
   .st.DITOLAK,.st.DIBATALKAN{background:var(--errbg);color:var(--err)}
+  .st.PROSES{background:var(--warnbg);color:var(--warn)} .st.SELESAI{background:var(--okbg);color:var(--ok)}
+  .so{font-size:10px;font-weight:bold;padding:1px 6px;border-radius:8px;background:#EFF0F2;margin-left:4px}
+  .so.DISETUJUI{background:var(--okbg);color:var(--ok)} .so.DITOLAK,.so.TIDAK{background:var(--errbg);color:var(--err)} .so.MENUNGGU{background:var(--warnbg);color:var(--warn)}
   .jn{display:inline-block;font-size:10px;font-weight:bold;padding:2px 6px;border-radius:4px;background:var(--char);color:#fff;margin-right:6px;vertical-align:1px}
   .jn.SPD{background:var(--brand)}
   .rw{border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:8px;cursor:pointer}
@@ -580,7 +583,7 @@ async function spdKirim() {
 
 function sukses(jenis, nomor, ringkas, status, warn) {
   modal('<h3 style="margin-top:0;color:var(--ok)">✅ ' + jenis + ' tersimpan</h3>' +
-    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' +
+    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + (jenis === 'SPL' ? '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) sedang dikirim ke tiap karyawan.</p>' : '') +
     (warn.length ? '<div class="msg warn">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</div>' : '') +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal();buka(\'riwayat\')">Lihat riwayat</button>' +
     '<button class="btn" onclick="tutupModal();buka(\'home\')">Selesai</button></div>');
@@ -603,7 +606,9 @@ function kartu(x) {
   let info, det;
   if (x.jenis === 'SPL') {
     info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang · ' + fmtJam(x.totalJam) + ' jam';
-    det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian)).join('<br>');
+    det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
+      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
+      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF SPL</a>' : '');
   } else {
     info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · ' + rp(x.totalBiaya);
     det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '')).join('<br>');

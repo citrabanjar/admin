@@ -12,6 +12,9 @@ function onOpen() {
     .addItem('3. Tes hitung lembur & SPD', 'tesHitung')
     .addSeparator()
     .addItem('🔗 Link form SPL & SPD', 'bukaForm')
+    .addSeparator()
+    .addItem('✉ Kirim ulang email konfirmasi SPL', 'menuKirimUlangKonfirmasi')
+    .addItem('📄 Buat & kirim PDF SPL sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addToUi();
 }
@@ -45,16 +48,26 @@ function setupAwal() {
   const kurang = ['Employee ID', 'Full Name', 'Job Position', 'Organization', 'Email'].filter(j => !kk[j]);
   if (kurang.length) SpreadsheetApp.getUi().alert('⚠ Kolom berikut belum ada di sheet karyawan:\n• ' + kurang.join('\n• ') +
     '\n\nJudul kolom harus persis seperti di atas.');
+  // Kolom Peran & Atasan di sheet karyawan (ditambahkan bila belum ada)
+  const shK = sheet_(SH.KARYAWAN);
   if (!kk['Peran']) {
-    const shK = sheet_(SH.KARYAWAN), col = shK.getLastColumn() + 1;
+    const col = shK.getLastColumn() + 1;
     shK.getRange(1, col).setValue('Peran').setFontWeight('bold');
     shK.getRange(2, col, shK.getMaxRows() - 1, 1).setDataValidation(
       SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
   }
+  if (!kk['Atasan']) {
+    const col = shK.getLastColumn() + 1;
+    shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
+       .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
+  }
+  // Kolom tambahan Data SPL untuk alur email
+  pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
+  rahasia_();
 
   logAksi_('-', '-', 'SETUP AWAL', Session.getActiveUser().getEmail(), 'Zona waktu ' + TZ + ', proteksi sheet sistem.');
   SpreadsheetApp.getUi().alert('✅ Setup awal selesai.\n\n• Zona waktu: ' + TZ +
-    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n• Kolom Peran tersedia di sheet karyawan (kosong = otomatis dari jabatan)\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
+    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n• Kolom Peran & Atasan tersedia di sheet karyawan:\n   – Peran: isi ADMIN untuk user yang boleh membuat surat (kosong = KARYAWAN)\n   – Atasan: isi Employee ID atasan langsung\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
 }
 
 /** Periksa kelengkapan master karyawan sebelum notifikasi email diaktifkan. */
@@ -84,16 +97,24 @@ function cekDataKaryawan() {
   const peranSalah = aktif.filter(k => PERAN.indexOf(k.peran) < 0);
   if (peranSalah.length) masalah.push({ j: '❌ Peran tidak dikenal', isi: peranSalah.map(k => k.id + ' — ' + k.peran) });
 
-  // Departemen tanpa manager
-  const deps = [...new Set(aktif.map(k => k.departemen).filter(Boolean))];
-  const tanpaMgr = deps.filter(d => managerDepartemen_(d).length === 0);
-  if (tanpaMgr.length) masalah.push({ j: 'ℹ Departemen tanpa MANAGER → ikut aturan TANPA_MANAGER = "' + P.TANPA_MANAGER + '"', isi: tanpaMgr });
+  const admin = aktif.filter(k => k.peran === 'ADMIN');
+  if (!admin.length) masalah.push({ j: '❌ Belum ada user ADMIN', isi: ['Isi Peran = ADMIN untuk user yang membuat SPL / SPD.'] });
+  const adminTanpaEmail = admin.filter(k => !k.email);
+  if (adminTanpaEmail.length) masalah.push({ j: '❌ ADMIN tanpa email (tidak bisa login form)', isi: adminTanpaEmail.map(k => k.id + ' — ' + k.nama) });
 
-  const pengelola = aktif.filter(k => ['PEMBUAT', 'MANAGER', 'HRD', 'ADMIN'].indexOf(k.peran) >= 0 && !k.email);
-  if (pengelola.length) masalah.push({ j: '❌ PEMBUAT/MANAGER/HRD/ADMIN tanpa email (tidak bisa login form & approve)', isi: pengelola.map(k => k.id + ' — ' + k.nama + ' (' + k.peran + ')') });
+  // Atasan langsung
+  const Kmap = karyawan_();
+  const tanpaAtasan = aktif.filter(k => !k.atasan);
+  if (tanpaAtasan.length) masalah.push({ j: '⚠ Atasan belum diisi (' + tanpaAtasan.length + ' orang) — persetujuan lembur mereka dikirim ke admin', isi: tanpaAtasan.map(k => k.id + ' — ' + k.nama) });
+  const atasanSalah = aktif.filter(k => k.atasan && !Kmap[k.atasan]);
+  if (atasanSalah.length) masalah.push({ j: '❌ Employee ID atasan tidak ditemukan', isi: atasanSalah.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan) });
+  const atasanTanpaEmail = aktif.filter(k => k.atasan && Kmap[k.atasan] && !Kmap[k.atasan].email);
+  if (atasanTanpaEmail.length) masalah.push({ j: '⚠ Atasan belum punya email — persetujuan dikirim ke admin', isi: atasanTanpaEmail.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan + ' ' + Kmap[k.atasan].nama) });
+  const diriSendiri = aktif.filter(k => k.atasan && k.atasan === k.id);
+  if (diriSendiri.length) masalah.push({ j: '❌ Atasan diisi diri sendiri', isi: diriSendiri.map(k => k.id + ' — ' + k.nama) });
 
-  if (daftarHRD_().length === 0) masalah.push({ j: '❌ Belum ada karyawan dengan Peran HRD', isi: ['Set Peran = HRD untuk orang yang memberi persetujuan akhir.'] });
-  if (!P.EMAIL_ADMIN) masalah.push({ j: '❌ Parameter EMAIL_ADMIN masih kosong', isi: ['Isi di sheet Parameter.'] });
+  if (!P.EMAIL_ADMIN) masalah.push({ j: 'ℹ Parameter EMAIL_ADMIN kosong (opsional — salinan PDF SPL)', isi: ['Isi di sheet Parameter bila PDF SPL perlu dikirim juga ke email lain.'] });
+  try { masalah.push({ j: 'ℹ Sisa kuota email hari ini: ' + MailApp.getRemainingDailyQuota(), isi: ['Gmail biasa ±100/hari, Google Workspace ±1.500/hari.'] }); } catch (e) {}
 
   const ringkas = {};
   aktif.forEach(k => ringkas[k.peran] = (ringkas[k.peran] || 0) + 1);
@@ -101,7 +122,7 @@ function cekDataKaryawan() {
   let html = '<div style="font-family:Arial;font-size:13px">' +
     '<p><b>Karyawan aktif:</b> ' + aktif.length + ' &nbsp;|&nbsp; ' +
     Object.keys(ringkas).map(p => p + ': ' + ringkas[p]).join(' · ') + '</p>';
-  if (!masalah.length) html += '<p style="color:green;font-size:15px">✅ Data karyawan lengkap. Siap lanjut ke Tahap 2.</p>';
+  if (!masalah.some(m => m.j.indexOf('❌') === 0)) html += '<p style="color:green;font-size:15px">✅ Tidak ada masalah kritis.</p>';
   masalah.forEach(m => {
     html += '<p style="margin:10px 0 4px"><b>' + m.j + '</b></p><div style="max-height:140px;overflow:auto;background:#f6f6f6;padding:6px;border-radius:4px">' +
       m.isi.map(x => '• ' + x).join('<br>') + '</div>';

@@ -74,13 +74,13 @@ function departemenDari_(org) {
   const i = o.indexOf(' GROUP');
   return i > 0 ? o.slice(0, i).trim() : o;
 }
-/** Peran default dari jabatan (dipakai bila kolom Peran kosong / tidak ada) */
+/** Peran default bila kolom Peran kosong: semua KARYAWAN (peran lain HANYA bila diisi manual) */
 function peranDefault_(jabatan) {
-  return ({ FOREMAN: 'PEMBUAT', SUPERVISOR: 'PEMBUAT', MANAGER: 'MANAGER' })[String(jabatan || '').toUpperCase().trim()] || 'KARYAWAN';
+  return 'KARYAWAN';
 }
 
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
- *  Opsional: Basic Salary, Departemen, Peran (kosong = default dari jabatan),
+ *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
 function karyawan_() {
   if (_K) return _K;
@@ -99,6 +99,7 @@ function karyawan_() {
       gaji: Number(r['Basic Salary']) || 0,           // RAHASIA — jangan dikirim ke form/email karyawan
       email: String(r['Email'] || '').trim().toLowerCase(),
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
+      atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });

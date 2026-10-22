@@ -12,7 +12,8 @@ const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN'];
 const SESI_DETIK = 6 * 3600;   // login berlaku 6 jam
 
 /* ------------------------------ Tampilan ------------------------------ */
-function doGet() {
+function doGet(e) {
+  if (e && e.parameter && e.parameter.a) return halamanAksi_(e.parameter);   // link dari email (Notif.gs)
   const t = HtmlService.createTemplateFromFile('Form');
   // rumus yang SAMA dengan server dipakai juga di browser (satu sumber rumus)
   t.rumusBersama = 'const NAMA_HARI = ' + JSON.stringify(NAMA_HARI) + ';\n' +

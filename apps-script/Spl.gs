@@ -12,8 +12,10 @@
  */
 function simpanSPL(token, data) {
   const u = sesiCek_(token);
+  pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba simpan lagi beberapa detik lagi.');
+  let hasilSimpan;
   try {
     _K = null; _L = null; _P = null;
     const P = param_(), K = karyawan_(), L = liburSet_();
@@ -41,7 +43,6 @@ function simpanSPL(token, data) {
     });
     if (err.length) return { ok: false, error: err };
 
-    const alur = alurApproval_(u);
     const tgl = Utilities.parseDate(tglStr + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
     const nomor = nomorBerikutnya_('SPL', tgl);
     const now = new Date();
@@ -53,23 +54,25 @@ function simpanSPL(token, data) {
       'Istirahat': x.h.istirahat, 'Jam Efektif': x.h.jamEfektif, 'Estimasi Kompensasi': x.h.kompensasi,
       'Uraian Pekerjaan': String(x.b.uraian).trim(),
       'Dibuat Oleh': u.nama, 'Email Pembuat': u.email, 'Dibuat Pada': now,
-      'Status': alur.status,
-      'Diketahui Oleh': alur.diketahuiOleh || '', 'Diketahui Pada': alur.diketahuiOleh ? now : '',
-      'Catatan': [].concat(x.h.peringatan, alur.catatan ? [alur.catatan] : []).join(' | '),
-      'Status Email': 'Belum dikirim',
+      'Status': ST.KONFIRMASI,
+      'Catatan': x.h.peringatan.join(' | '),
+      'Status Email': 'Mengirim…',
       'ID Baris': Utilities.getUuid().slice(0, 8)
     })), ['Jam Mulai', 'Jam Selesai']);
     SpreadsheetApp.flush();
 
     const totalJam = hasil.reduce((s, x) => s + x.h.jamEfektif, 0);
-    logAksi_('SPL', nomor, 'DIBUAT', u.email, hasil.length + ' karyawan, ' + totalJam + ' jam, tgl ' + tglStr + ' → ' + alur.status);
-    return { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: alur.status };
+    logAksi_('SPL', nomor, 'DIBUAT', u.email, hasil.length + ' karyawan, ' + totalJam + ' jam, tgl ' + tglStr);
+    hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: ST.KONFIRMASI };
   } finally {
     lock.releaseLock();
   }
+  // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
+  try { kirimKonfirmasiSPL_(hasilSimpan.nomor); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  return hasilSimpan;
 }
 
-/** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor. */
+/** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
 function riwayatSPL(token) {
   const u = sesiCek_(token);
   const g = {};
@@ -78,11 +81,16 @@ function riwayatSPL(token) {
     const n = r['Nomor SPL'];
     if (!g[n]) g[n] = {
       jenis: 'SPL', nomor: n, tanggal: r['Tanggal Lembur'] instanceof Date ? ymd_(r['Tanggal Lembur']) : '',
-      hari: r['Hari'], statusHari: r['Status Hari'], status: r['Status'],
+      hari: r['Hari'], statusHari: r['Status Hari'], pdf: r['Link PDF'] || '',
       dibuat: r['Dibuat Pada'] instanceof Date ? r['Dibuat Pada'].getTime() : 0, orang: [], totalJam: 0
     };
-    g[n].orang.push({ nama: r['Full Name'], mulai: String(r['Jam Mulai']), selesai: String(r['Jam Selesai']), jam: Number(r['Jam Efektif']) || 0, uraian: r['Uraian Pekerjaan'] });
+    g[n].orang.push({ nama: r['Full Name'], mulai: String(r['Jam Mulai']), selesai: String(r['Jam Selesai']),
+      jam: Number(r['Jam Efektif']) || 0, uraian: r['Uraian Pekerjaan'], status: r['Status'] });
     g[n].totalJam += Number(r['Jam Efektif']) || 0;
   });
-  return Object.values(g).sort((a, b) => b.dibuat - a.dibuat).slice(0, 30);
+  return Object.values(g).map(x => {
+    const selesai = x.orang.filter(o => ST_FINAL.indexOf(o.status) >= 0).length;
+    x.status = selesai === x.orang.length ? 'SELESAI' : 'PROSES ' + selesai + '/' + x.orang.length;
+    return x;
+  }).sort((a, b) => b.dibuat - a.dibuat).slice(0, 30);
 }
