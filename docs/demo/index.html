@@ -223,7 +223,6 @@ window.SERVER={
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Jam Mulai</th><th>Jam Selesai</th>
             <th>Istirahat</th><th>Jam Efektif</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
           <tbody id="lRows"></tbody>
-          <tfoot><tr><td colspan="5" style="text-align:right">TOTAL JAM LEMBUR</td><td id="lTot" style="text-align:center">0</td><td colspan="2"></td></tr></tfoot>
         </table>
       </div>
       <div class="bar">
@@ -231,7 +230,7 @@ window.SERVER={
           <button class="btn sec kecil" onclick="splTambah()">+ Tambah karyawan</button>
           <button class="btn sec kecil" onclick="splSamakan()">⇩ Samakan dengan baris 1</button>
         </div>
-        <div class="sum"><b id="lOrang">0</b> karyawan · <b id="lJam">0</b> jam</div>
+        <div class="sum"><b id="lOrang">0</b> karyawan</div>
       </div>
       <div id="lErr"></div>
       <div class="bar" style="justify-content:flex-end"><button class="btn" id="lKirim" onclick="splKonfirmasi()">Kirim Surat</button></div>
@@ -721,7 +720,7 @@ function hitungSPL() {
     if (w.length && k) warnUU.push(k.nama);
     if (e.length) adaErr = true;
   });
-  $('lTot').textContent = $('lJam').textContent = fmtJam(tot); $('lOrang').textContent = orang;
+  $('lOrang').textContent = orang;
   pesan('lInfo', 'warn', warnUU.length ? '⚠ Perusahaan melanggar UU Ketenagakerjaan karena mempekerjakan karyawan melebihi batas (' + esc(warnUU.join(', ')) + ').' : '');
   SPL_OK = !adaErr && orang > 0 && !!tgl;
   $('lKirim').disabled = !SPL_OK;
@@ -744,7 +743,7 @@ async function splKirim() {
     const r = await run('simpanSPL', TOKEN, splData());
     if (!r.ok) { tutupModal(); pesan('lErr', 'err', '<b>Surat belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
     splBaru();
-    sukses('SPL', r.nomor, r.jumlah + ' karyawan · ' + fmtJam(r.totalJam) + ' jam', r.status, []);
+    sukses('SPL', r.nomor, r.jumlah + ' karyawan', r.status, []);
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('lErr', 'err', esc(errText(e))); }
 }
 
