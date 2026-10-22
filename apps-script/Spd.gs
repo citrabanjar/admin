@@ -57,7 +57,8 @@ function simpanSPD(token, d) {
     }
     if (err.length) return { ok: false, error: err };
 
-    const alur = alurApproval_(u);
+    // SPD: belum ada alur email/persetujuan (menyusul) — status awal TERSIMPAN
+    const alur = { status: 'TERSIMPAN' };
     const tp = s => Utilities.parseDate(s + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
     const tglSurat = tp(d.tanggalSurat);
     const nomor = nomorBerikutnya_('SPD', tglSurat);

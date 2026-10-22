@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'PEMBUAT', 'MANAGER', 'HRD', 'ADMIN'];
+const PERAN = ['KARYAWAN', 'ADMIN'];   // ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */
@@ -109,14 +109,6 @@ function cariKaryawanByEmail_(email) {
   email = String(email || '').trim().toLowerCase();
   return Object.values(karyawan_()).find(k => k.email && k.email === email) || null;
 }
-/** Manager departemen (bisa lebih dari satu). */
-function managerDepartemen_(departemen) {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.peran === 'MANAGER' && k.departemen === departemen);
-}
-function daftarHRD_() {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.peran === 'HRD');
-}
-
 /* ---------- Libur & hari ---------- */
 let _L = null;
 function liburSet_() {
@@ -340,12 +332,11 @@ function setupAwal() {
     '\n\nJudul kolom harus persis seperti di atas.');
   // Kolom Peran & Atasan di sheet karyawan (ditambahkan bila belum ada)
   const shK = sheet_(SH.KARYAWAN);
-  if (!kk['Peran']) {
-    const col = shK.getLastColumn() + 1;
-    shK.getRange(1, col).setValue('Peran').setFontWeight('bold');
-    shK.getRange(2, col, shK.getMaxRows() - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
-  }
+  // Kolom Peran: dropdown ADMIN / KARYAWAN (kosong = KARYAWAN)
+  let colPeran = kk['Peran'];
+  if (!colPeran) { colPeran = shK.getLastColumn() + 1; shK.getRange(1, colPeran).setValue('Peran').setFontWeight('bold'); }
+  shK.getRange(2, colPeran, shK.getMaxRows() - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
   if (!kk['Atasan']) {
     const col = shK.getLastColumn() + 1;
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
@@ -464,7 +455,7 @@ function lihatNomorBerikutnya() {
  * =====================================================================
  */
 
-const PERAN_PEMBUAT = ['PEMBUAT', 'MANAGER', 'HRD', 'ADMIN'];
+const PERAN_PEMBUAT = ['ADMIN'];
 const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN'];
 const SESI_DETIK = 6 * 3600;   // login berlaku 6 jam
 
@@ -489,7 +480,7 @@ function bukaForm() {
   const ui = SpreadsheetApp.getUi();
   if (!url) { ui.alert('Form belum di-deploy.\n\nDeploy → New deployment → Web app (lihat panduan).'); return; }
   ui.showModalDialog(HtmlService.createHtmlOutput(
-    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke PEMBUAT / MANAGER):<br><br>' +
+    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke user ADMIN):<br><br>' +
     '<input style="width:100%;padding:6px" value="' + url + '" onclick="this.select()" readonly><br><br>' +
     '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Form SPL & SPD');
 }
@@ -524,7 +515,7 @@ function loginOtomatis() {
 function kirimKode(email) {
   email = String(email || '').trim().toLowerCase();
   const k = pembuatByEmail_(email);
-  if (!k) throw new Error('Email tidak terdaftar sebagai pembuat surat. Hubungi Admin/HRD.');
+  if (!k) throw new Error('Email tidak terdaftar sebagai ADMIN. Hubungi pengelola sistem.');
   const c = CacheService.getScriptCache();
   const n = Number(c.get('N_' + email) || 0);
   if (n >= 5) throw new Error('Terlalu banyak permintaan kode. Coba lagi 1 jam lagi.');
@@ -592,25 +583,6 @@ function dataForm(token) {
       bukti: pil['Bukti'] || ['Ada', 'Tidak Ada']
     }
   };
-}
-
-/* ------------------------------ Alur approval ------------------------------ */
-/**
- * Dibuat (pembuat) → Diketahui (Manager departemen pembuat) → Disetujui (HRD).
- * - Pembuat adalah MANAGER  → otomatis "Diketahui" oleh dirinya, langsung ke HRD
- * - Departemen tanpa MANAGER → Parameter TANPA_MANAGER: "LANGSUNG HRD" atau email pengganti
- */
-function alurApproval_(pembuat) {
-  if (pembuat.peran === 'MANAGER')
-    return { status: 'MENUNGGU HRD', diketahuiOleh: pembuat.nama, approver: daftarHRD_() };
-  const mgr = managerDepartemen_(pembuat.departemen);
-  if (mgr.length) return { status: 'MENUNGGU MANAGER', approver: mgr };
-  const t = String(param_().TANPA_MANAGER || 'LANGSUNG HRD').trim();
-  if (t.indexOf('@') > 0) {
-    const pengganti = cariKaryawanByEmail_(t);
-    return { status: 'MENUNGGU MANAGER', approver: [pengganti || { nama: t, email: t.toLowerCase() }] };
-  }
-  return { status: 'MENUNGGU HRD', approver: daftarHRD_(), catatan: 'Departemen tanpa Manager — langsung ke HRD' };
 }
 
 /** Tulis beberapa baris objek {judul: nilai} ke sheet sesuai judul kolom. */
@@ -802,7 +774,8 @@ function simpanSPD(token, d) {
     }
     if (err.length) return { ok: false, error: err };
 
-    const alur = alurApproval_(u);
+    // SPD: belum ada alur email/persetujuan (menyusul) — status awal TERSIMPAN
+    const alur = { status: 'TERSIMPAN' };
     const tp = s => Utilities.parseDate(s + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
     const tglSurat = tp(d.tanggalSurat);
     const nomor = nomorBerikutnya_('SPD', tglSurat);

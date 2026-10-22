@@ -50,12 +50,11 @@ function setupAwal() {
     '\n\nJudul kolom harus persis seperti di atas.');
   // Kolom Peran & Atasan di sheet karyawan (ditambahkan bila belum ada)
   const shK = sheet_(SH.KARYAWAN);
-  if (!kk['Peran']) {
-    const col = shK.getLastColumn() + 1;
-    shK.getRange(1, col).setValue('Peran').setFontWeight('bold');
-    shK.getRange(2, col, shK.getMaxRows() - 1, 1).setDataValidation(
-      SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
-  }
+  // Kolom Peran: dropdown ADMIN / KARYAWAN (kosong = KARYAWAN)
+  let colPeran = kk['Peran'];
+  if (!colPeran) { colPeran = shK.getLastColumn() + 1; shK.getRange(1, colPeran).setValue('Peran').setFontWeight('bold'); }
+  shK.getRange(2, colPeran, shK.getMaxRows() - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
   if (!kk['Atasan']) {
     const col = shK.getLastColumn() + 1;
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')

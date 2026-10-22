@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'PEMBUAT', 'MANAGER', 'HRD', 'ADMIN'];
+const PERAN = ['KARYAWAN', 'ADMIN'];   // ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */
@@ -109,14 +109,6 @@ function cariKaryawanByEmail_(email) {
   email = String(email || '').trim().toLowerCase();
   return Object.values(karyawan_()).find(k => k.email && k.email === email) || null;
 }
-/** Manager departemen (bisa lebih dari satu). */
-function managerDepartemen_(departemen) {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.peran === 'MANAGER' && k.departemen === departemen);
-}
-function daftarHRD_() {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.peran === 'HRD');
-}
-
 /* ---------- Libur & hari ---------- */
 let _L = null;
 function liburSet_() {

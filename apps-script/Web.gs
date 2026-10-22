@@ -7,7 +7,7 @@
  * =====================================================================
  */
 
-const PERAN_PEMBUAT = ['PEMBUAT', 'MANAGER', 'HRD', 'ADMIN'];
+const PERAN_PEMBUAT = ['ADMIN'];
 const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN'];
 const SESI_DETIK = 6 * 3600;   // login berlaku 6 jam
 
@@ -32,7 +32,7 @@ function bukaForm() {
   const ui = SpreadsheetApp.getUi();
   if (!url) { ui.alert('Form belum di-deploy.\n\nDeploy → New deployment → Web app (lihat panduan).'); return; }
   ui.showModalDialog(HtmlService.createHtmlOutput(
-    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke PEMBUAT / MANAGER):<br><br>' +
+    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke user ADMIN):<br><br>' +
     '<input style="width:100%;padding:6px" value="' + url + '" onclick="this.select()" readonly><br><br>' +
     '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Form SPL & SPD');
 }
@@ -67,7 +67,7 @@ function loginOtomatis() {
 function kirimKode(email) {
   email = String(email || '').trim().toLowerCase();
   const k = pembuatByEmail_(email);
-  if (!k) throw new Error('Email tidak terdaftar sebagai pembuat surat. Hubungi Admin/HRD.');
+  if (!k) throw new Error('Email tidak terdaftar sebagai ADMIN. Hubungi pengelola sistem.');
   const c = CacheService.getScriptCache();
   const n = Number(c.get('N_' + email) || 0);
   if (n >= 5) throw new Error('Terlalu banyak permintaan kode. Coba lagi 1 jam lagi.');
@@ -135,25 +135,6 @@ function dataForm(token) {
       bukti: pil['Bukti'] || ['Ada', 'Tidak Ada']
     }
   };
-}
-
-/* ------------------------------ Alur approval ------------------------------ */
-/**
- * Dibuat (pembuat) → Diketahui (Manager departemen pembuat) → Disetujui (HRD).
- * - Pembuat adalah MANAGER  → otomatis "Diketahui" oleh dirinya, langsung ke HRD
- * - Departemen tanpa MANAGER → Parameter TANPA_MANAGER: "LANGSUNG HRD" atau email pengganti
- */
-function alurApproval_(pembuat) {
-  if (pembuat.peran === 'MANAGER')
-    return { status: 'MENUNGGU HRD', diketahuiOleh: pembuat.nama, approver: daftarHRD_() };
-  const mgr = managerDepartemen_(pembuat.departemen);
-  if (mgr.length) return { status: 'MENUNGGU MANAGER', approver: mgr };
-  const t = String(param_().TANPA_MANAGER || 'LANGSUNG HRD').trim();
-  if (t.indexOf('@') > 0) {
-    const pengganti = cariKaryawanByEmail_(t);
-    return { status: 'MENUNGGU MANAGER', approver: [pengganti || { nama: t, email: t.toLowerCase() }] };
-  }
-  return { status: 'MENUNGGU HRD', approver: daftarHRD_(), catatan: 'Departemen tanpa Manager — langsung ke HRD' };
 }
 
 /** Tulis beberapa baris objek {judul: nilai} ke sheet sesuai judul kolom. */
