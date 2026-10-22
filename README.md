@@ -14,6 +14,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 | `Web.gs` | Web App: tampilan, login OTP email, data form, alur approval |
 | `Spl.gs` | Simpan & riwayat Surat Perintah Lembur |
 | `Spd.gs` | Simpan & riwayat Surat Perintah Dinas |
+| `Sinkron.gs` | Menu sinkron data karyawan dari sheet lain (cocok per Employee ID) |
 | `Form.html` | Tampilan form (Beranda · SPL · SPD · Riwayat) |
 
 ## Pasang
