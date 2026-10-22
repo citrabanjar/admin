@@ -9,6 +9,7 @@ window.google={script:{get run(){return mkRun()}}};
 const RW_SPL=[{jenis:'SPL',nomor:'001 / SPL / CBA / X / 2026',tanggal:'2026-10-21',hari:'Rabu',statusHari:'Hari Kerja',status:'MENUNGGU MANAGER',dibuat:1,orang:[{nama:'BUDI SANTOSO',mulai:'16:00',selesai:'22:00',jam:5,uraian:'Welding frame project X'}],totalJam:5}];
 const RW_SPD=[{jenis:'SPD',nomor:'001 / SPD / CBA / X / 2026',status:'DISETUJUI',tanggal:'2026-10-20',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,tempat:'Cilegon',maksud:'Survey lokasi proyek',totalBiaya:600000,dibuat:0,orang:[{nama:'RINA MARLINA',lama:3,keterangan:''}]}];
 let nSPL=1,nSPD=1;
+const dataP={JAM_MULAI_MIN_SENJUM:'16:00',JAM_MULAI_MIN_SABTU:'13:00',JAM_MULAI_MIN_LIBUR:'08:00',JAM_SELESAI_MAKS:'24:00',ISTIRAHAT_HARI_KERJA:'18:00-19:00',ISTIRAHAT_HARI_LIBUR:'12:00-13:00',BATAS_SELESAI_LIBUR:'18:00',PEMBAGI_TARIF:173,FAKTOR_HARI_KERJA:1.5,FAKTOR_HARI_LIBUR:2};
 window.SERVER={
  loginOtomatis:()=>({token:null}),
  kirimKode:e=>{if(!/@/.test(e))throw new Error('Email tidak terdaftar sebagai pembuat surat. Hubungi Admin/HRD.');return 'Kode dikirim ke '+e.replace(/^(.{2}).*(@.*)$/,'$1•••$2')},
@@ -21,6 +22,7 @@ window.SERVER={
    pilihan:{transportasi:['Kendaraan Pribadi','Kendaraan Dinas','Kendaraan Umum'],sumberBiaya:['Perusahaan','Customer','Proyek'],dasarPenugasan:['Penugasan Langsung','Tindak Lanjut Project','Survey'],jenisBiaya:['Tiket Transportasi','Akomodasi / Hotel','BBM','Tol & Parkir','Konsumsi','Lain-lain'],bukti:['Ada','Tidak Ada']}}),
  simpanSPL:(t,d)=>{window.TERKIRIM=d;const no=String(++nSPL).padStart(3,'0')+' / SPL / CBA / X / 2026';RW_SPL.unshift({jenis:'SPL',nomor:no,tanggal:d.tanggal,hari:'-',statusHari:'-',status:'MENUNGGU MANAGER',dibuat:Date.now(),orang:d.baris.map(b=>({nama:b.id,mulai:b.mulai,selesai:b.selesai,jam:0,uraian:b.uraian})),totalJam:0});return {ok:true,nomor:no,jumlah:d.baris.length,totalJam:0,status:'MENUNGGU MANAGER'}},
  simpanSPD:(t,d)=>{window.TERKIRIM_SPD=d;const no=String(++nSPD).padStart(3,'0')+' / SPD / CBA / X / 2026';RW_SPD.unshift({jenis:'SPD',nomor:no,status:'MENUNGGU MANAGER',tanggal:d.tanggalSurat,berangkat:d.berangkat,kembali:d.kembali,tempat:d.tempat,maksud:d.maksud,totalBiaya:0,dibuat:Date.now(),orang:d.personel.map(p=>({nama:p.id,lama:p.lama,keterangan:p.keterangan}))});return {ok:true,nomor:no,jumlah:d.personel.length,lama:3,totalBiaya:0,status:'MENUNGGU MANAGER',peringatan:[]}},
+ estimasiSPL:(t,d)=>d.baris.map(b=>{if(!(b.id&&b.mulai&&b.selesai&&d.tanggal))return null;const h=hitungLembur_({tanggal:d.tanggal,mulai:b.mulai,selesai:b.selesai,gaji:4642000},dataP,Object.assign({},{'2026-12-25':1},d.liburNasional?{[d.tanggal]:1}:{}));return h.error.length?null:h.kompensasi}),
  riwayatSPL:()=>RW_SPL, riwayatSPD:()=>RW_SPD
 };
 </script><meta name="viewport" content="width=device-width, initial-scale=1"><title>Demo Form SPL & SPD</title>
@@ -85,6 +87,9 @@ window.SERVER={
   .acx{padding:10px;color:var(--mute);font-size:12px}
   input.kq.ok{background:#F2FAF5;border-color:#9ED3B4}
   select:disabled{background:#EFF0F2;color:#999}
+  .cek{display:flex!important;align-items:center;gap:8px;min-height:36px;padding:6px 10px;border:1px dashed #CBCED4;border-radius:6px;background:#fff;color:var(--ink)!important;font-size:12px;cursor:pointer;margin:0}
+  .cek input{width:18px;height:18px;accent-color:var(--brand);margin:0}
+  .cek.kunci{opacity:.6;cursor:default}
   .del{background:none;border:0;color:var(--err);font-size:18px;cursor:pointer;padding:6px}
   tfoot td{font-weight:bold;background:#EFF0F2;padding:10px 6px}
   .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;justify-content:space-between;margin-top:12px}
@@ -198,6 +203,7 @@ window.SERVER={
           <div style="max-width:200px"><label>Tanggal Lembur *</label><input id="lTgl" type="date" onchange="hitungSPL()"></div>
           <div style="max-width:150px"><label>Hari</label><div class="chip" id="lHari">–</div></div>
           <div style="max-width:190px"><label>Status Hari</label><div class="chip" id="lStatus">–</div></div>
+          <div style="max-width:190px"><label>&nbsp;</label><label class="cek" id="lLiburBox"><input type="checkbox" id="lLibur" onchange="hitungSPL()"> Libur nasional / cuti bersama</label></div>
           <div><label>Jam mulai paling awal</label><div class="chip" id="lMin">–</div></div>
         </div>
         <div id="lInfo"></div>
@@ -205,9 +211,9 @@ window.SERVER={
       <div class="card" style="padding:0">
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Jam Mulai</th><th>Jam Selesai</th>
-            <th>Istirahat</th><th>Jam Efektif</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
+            <th>Istirahat</th><th>Jam Efektif</th><th>Estimasi Kompensasi</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
           <tbody id="lRows"></tbody>
-          <tfoot><tr><td colspan="5" style="text-align:right">TOTAL JAM LEMBUR</td><td id="lTot" style="text-align:center">0</td><td colspan="2"></td></tr></tfoot>
+          <tfoot><tr><td colspan="5" style="text-align:right">TOTAL JAM LEMBUR</td><td id="lTot" style="text-align:center">0</td><td id="lKompTot" class="uang">-</td><td colspan="2"></td></tr></tfoot>
         </table>
       </div>
       <div class="bar">
@@ -483,11 +489,18 @@ function acTutup(inp) {
 }
 function acKosongkan(el) { const i = el.querySelector('.kq'); i.value = ''; i.dataset.label = ''; i.classList.remove('ok'); el.querySelector('.k').value = ''; }
 
+/* ===== libur efektif (daftar libur + centang "Libur nasional") ===== */
+function liburForm() {
+  const L = Object.assign({}, D.libur), tgl = $('lTgl').value;
+  if (tgl && $('lLibur').checked && !L[tgl]) L[tgl] = 'Libur nasional';
+  return L;
+}
+
 /* ===== pilihan jam mengikuti batasan ===== */
 function jamMinMaks() {
   const t = keTanggal_($('lTgl').value);
   if (!t) return null;
-  const st = statusHari_(t, D.libur), hk = hariKe_(t);
+  const st = statusHari_(t, liburForm()), hk = hariKe_(t);
   const min = jamKeAngka_(st === 'Hari Libur' ? D.P.JAM_MULAI_MIN_LIBUR : hk === 6 ? D.P.JAM_MULAI_MIN_SABTU : D.P.JAM_MULAI_MIN_SENJUM);
   return { min: min, maks: jamKeAngka_(D.P.JAM_SELESAI_MAKS) };
 }
@@ -566,7 +579,7 @@ function buka(p) {
    SPL
    ===================================================================== */
 let LROWS = [], SPL_OK = false;
-function splBaru() { $('lTgl').value = ''; LROWS = []; $('lRows').innerHTML = ''; splTambah(); pesan('lErr'); hitungSPL(); }
+function splBaru() { $('lTgl').value = ''; $('lLibur').checked = false; LROWS = []; $('lRows').innerHTML = ''; splTambah(); pesan('lErr'); hitungSPL(); }
 function splTambah() {
   const maks = Number(D.P.MAKS_KARYAWAN_PER_SPL) || 30;
   if (LROWS.length >= maks) { alert('Maksimal ' + maks + ' karyawan per SPL.'); return; }
@@ -577,7 +590,7 @@ function splTambah() {
     '<td data-l="Karyawan">' + htmlCariKaryawan('hitungSPL') + '<div class="sub jab"></div><div class="rowerr"></div><div class="rowwarn"></div></td>' +
     '<td class="half" data-l="Jam Mulai"><select class="m" onchange="hitungSPL()"></select></td>' +
     '<td class="half" data-l="Jam Selesai"><select class="s" onchange="hitungSPL()"></select></td>' +
-    '<td class="auto ist" data-l="Istirahat">-</td><td class="auto ef" data-l="Jam Efektif">-</td>' +
+    '<td class="auto ist" data-l="Istirahat">-</td><td class="auto ef" data-l="Jam Efektif">-</td><td class="auto uang komp" data-l="Estimasi Kompensasi">-</td>' +
     '<td data-l="Uraian Pekerjaan"><textarea class="u" rows="2" placeholder="Contoh: Welding frame project X" oninput="hitungSPL()"></textarea></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="splHapus(' + id + ')">✕</button></td>';
   $('lRows').appendChild(tr); LROWS.push({ id: id, el: tr });
@@ -599,11 +612,17 @@ function hitungSPL() {
   if (!D) return;
   const tgl = $('lTgl').value, t = keTanggal_(tgl);
   if (t) {
-    const st = statusHari_(t, D.libur), hk = hariKe_(t), lib = D.libur[ymd_(t)];
+    // centang libur: otomatis tercentang & terkunci bila tanggal sudah di daftar libur / hari Minggu
+    const sudahLibur = !!D.libur[ymd_(t)] || hariKe_(t) === 7, cb = $('lLibur');
+    if (sudahLibur) { cb.checked = true; cb.dataset.auto = '1'; }
+    else if (cb.dataset.auto) { cb.checked = false; delete cb.dataset.auto; }   // tercentang otomatis sebelumnya → lepas
+    cb.disabled = sudahLibur; $('lLiburBox').classList.toggle('kunci', sudahLibur);
+    const LF = liburForm();
+    const st = statusHari_(t, LF), hk = hariKe_(t), lib = LF[ymd_(t)];
     $('lHari').textContent = NAMA_HARI[hk - 1];
     $('lStatus').textContent = st + (lib ? ' (' + lib + ')' : ''); $('lStatus').className = 'chip ' + (st === 'Hari Libur' ? 'libur' : 'kerja');
     $('lMin').textContent = (st === 'Hari Libur' ? D.P.JAM_MULAI_MIN_LIBUR : hk === 6 ? D.P.JAM_MULAI_MIN_SABTU : D.P.JAM_MULAI_MIN_SENJUM) + '  ·  selesai maks ' + D.P.JAM_SELESAI_MAKS;
-  } else { $('lHari').textContent = $('lStatus').textContent = $('lMin').textContent = '–'; $('lStatus').className = 'chip'; }
+  } else { $('lHari').textContent = $('lStatus').textContent = $('lMin').textContent = '–'; $('lStatus').className = 'chip'; $('lLibur').disabled = true; }
   let tot = 0, orang = 0, adaErr = false; const dipakai = {}, warnUU = [];
   LROWS.forEach((r, i) => {
     aturJamBaris(r.el);
@@ -616,7 +635,7 @@ function hitungSPL() {
       orang++;
       if (dipakai[id]) e.push('Karyawan ini sudah ada di baris ' + dipakai[id] + '.'); else dipakai[id] = i + 1;
       if (!tgl) e.push('Isi Tanggal Lembur terlebih dahulu.');
-      else if (m && s) { h = hitungLembur_({ tanggal: tgl, mulai: m, selesai: s, gaji: 0 }, D.P, D.libur); e.push.apply(e, h.error); w.push.apply(w, h.peringatan); }
+      else if (m && s) { h = hitungLembur_({ tanggal: tgl, mulai: m, selesai: s, gaji: 0 }, D.P, liburForm()); e.push.apply(e, h.error); w.push.apply(w, h.peringatan); }
       else e.push('Pilih jam mulai & jam selesai.');
       if (!u) e.push('Uraian pekerjaan wajib diisi.');
     }
@@ -633,9 +652,29 @@ function hitungSPL() {
   pesan('lInfo', 'warn', warnUU.length ? '⚠ Perusahaan melanggar UU Ketenagakerjaan karena mempekerjakan karyawan melebihi batas (' + esc(warnUU.join(', ')) + ').' : '');
   SPL_OK = !adaErr && orang > 0 && !!tgl;
   $('lKirim').disabled = !SPL_OK;
+  jadwalEstimasi();
+}
+
+/* ===== estimasi kompensasi (dihitung server, ditunda 0,4 dtk setelah perubahan) ===== */
+let tEst = null, nEst = 0;
+function jadwalEstimasi() {
+  clearTimeout(tEst);
+  tEst = setTimeout(async () => {
+    const d = splData(), ke = ++nEst, sel = LROWS.map(r => r.el.querySelector('.komp'));
+    const baris = LROWS.map(r => ({ id: r.el.querySelector('.k').value, mulai: r.el.querySelector('.m').value, selesai: r.el.querySelector('.s').value }));
+    if (!d.tanggal || !baris.some(b => b.id && b.mulai && b.selesai)) { sel.forEach(c => c.textContent = '-'); $('lKompTot').textContent = '-'; return; }
+    sel.forEach((c, i) => { if (baris[i].id && baris[i].mulai && baris[i].selesai) c.textContent = '…'; });
+    try {
+      const h = await run('estimasiSPL', TOKEN, { tanggal: d.tanggal, liburNasional: d.liburNasional, baris: baris });
+      if (ke !== nEst) return;   // ada perubahan lebih baru
+      let tot = 0;
+      h.forEach((v, i) => { if (sel[i]) sel[i].textContent = v == null ? '-' : rp(v); tot += v || 0; });
+      $('lKompTot').textContent = tot ? rp(tot) : '-';
+    } catch (e) { if (!sesiHabis(e)) sel.forEach(c => c.textContent = '-'); }
+  }, 400);
 }
 function splData() {
-  return { tanggal: $('lTgl').value,
+  return { tanggal: $('lTgl').value, liburNasional: $('lLibur').checked && !$('lLibur').disabled,
     baris: LROWS.map(r => ({ id: r.el.querySelector('.k').value, mulai: r.el.querySelector('.m').value, selesai: r.el.querySelector('.s').value, uraian: r.el.querySelector('.u').value })).filter(b => b.id) };
 }
 function splKonfirmasi() {

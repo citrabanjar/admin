@@ -18,7 +18,7 @@ function simpanSPL(token, data) {
   let hasilSimpan;
   try {
     _K = null; _L = null; _P = null;
-    const P = param_(), K = karyawan_(), L = liburSet_();
+    const P = param_(), K = karyawan_(), L = liburEfektif_(data && data.tanggal, data && data.liburNasional);
     const err = [];
     const tglStr = String(data && data.tanggal || '');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(tglStr)) throw new Error('Tanggal lembur wajib diisi.');
@@ -55,12 +55,13 @@ function simpanSPL(token, data) {
       'Uraian Pekerjaan': String(x.b.uraian).trim(),
       'Dibuat Oleh': u.nama, 'Email Pembuat': u.email, 'Dibuat Pada': now,
       'Status': ST.KONFIRMASI,
-      'Catatan': x.h.peringatan.join(' | '),
+      'Catatan': [].concat(data.liburNasional && !liburSet_()[tglStr] ? ['Ditandai libur nasional oleh admin'] : [], x.h.peringatan).join(' | '),
       'Status Email': 'Mengirim…',
       'ID Baris': Utilities.getUuid().slice(0, 8)
     })), ['Jam Mulai', 'Jam Selesai']);
     SpreadsheetApp.flush();
 
+    if (data.liburNasional) catatLibur_(tglStr, u.nama);
     const totalJam = hasil.reduce((s, x) => s + x.h.jamEfektif, 0);
     logAksi_('SPL', nomor, 'DIBUAT', u.email, hasil.length + ' karyawan, ' + totalJam + ' jam, tgl ' + tglStr);
     hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: ST.KONFIRMASI };
@@ -70,6 +71,31 @@ function simpanSPL(token, data) {
   // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
   try { kirimKonfirmasiSPL_(hasilSimpan.nomor); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
+}
+
+/** Daftar libur + tanggal yang dicentang "Libur Nasional" di form */
+function liburEfektif_(tglStr, centang) {
+  const L = Object.assign({}, liburSet_());
+  if (centang && /^\d{4}-\d{2}-\d{2}$/.test(String(tglStr || '')) && !L[tglStr]) L[tglStr] = 'Libur nasional';
+  return L;
+}
+/** Tanggal yang dicentang libur nasional → dicatat ke sheet Libur (bila belum ada) */
+function catatLibur_(tglStr, oleh) {
+  if (liburSet_()[tglStr]) return;
+  sheet_(SH.LIBUR).appendRow([Utilities.parseDate(tglStr + ' 00:00', TZ, 'yyyy-MM-dd HH:mm'), '', 'Libur nasional (ditandai ' + oleh + ' via form SPL)']);
+  _L = null;
+}
+
+/** Estimasi kompensasi per baris (dihitung di server — gaji tidak dikirim ke browser). */
+function estimasiSPL(token, data) {
+  sesiCek_(token);
+  const P = param_(), K = karyawan_(), L = liburEfektif_(data && data.tanggal, data && data.liburNasional);
+  return ((data && data.baris) || []).map(b => {
+    const k = K[String(b.id || '').toUpperCase()];
+    if (!k || !b.mulai || !b.selesai || !data.tanggal) return null;
+    const h = hitungLembur_({ tanggal: data.tanggal, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
+    return h.error.length ? null : h.kompensasi;
+  });
 }
 
 /** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
