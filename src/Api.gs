@@ -98,6 +98,10 @@ function apiSetuju_() {
   const sh = sheetCek_(), n = sh.getLastRow() - 1;
   if (n < 1) return { ok: true, baris: [] };
   const v = sh.getRange(2, 1, n, KOLOM_CEK.length).getValues();
+  const st = {}; bacaTabel_(SH.SPL, 'Nomor SPL').forEach(r => st[String(r['ID Baris'])] = r['Status']);
+  // lembur yang sudah dibatalkan / tidak lagi DISETUJUI tidak boleh di-approve di KantorKu
+  v.forEach((r, i) => { if (r[12] === true && !String(r[13]).trim() && st[String(r[1])] && st[String(r[1])] !== ST.SETUJU) {
+    sh.getRange(i + 2, 14).setValue('TIDAK DIEKSEKUSI: lembur ' + st[String(r[1])]); r[13] = 'x'; } });
   return { ok: true, baris: v.filter(r => r[12] === true && !String(r[13]).trim()).map(r => ({
     idBaris: String(r[1]), nomor: r[2], tanggal: r[3] instanceof Date ? ymd_(r[3]) : String(r[3]),
     id: String(r[4]).toUpperCase(), nama: r[5], jamSpl: r[6], jamEfektif: r[7], jamKantorku: r[8], durasiKantorku: r[9]

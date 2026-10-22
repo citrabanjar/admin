@@ -18,7 +18,7 @@ const ST = {
   SETUJU: 'DISETUJUI', TOLAK: 'DITOLAK', BATAL: 'DIBATALKAN'
 };
 const ST_FINAL = [ST.TIDAK, ST.SETUJU, ST.TOLAK, ST.BATAL];
-const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'Link PDF Atasan', 'KantorKu'];
+const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'Link PDF Atasan', 'KantorKu', 'Dibatalkan Oleh', 'Dibatalkan Pada', 'Alasan Pembatalan'];
 const KOLOM_SPD_TAMBAHAN = ['Status', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Atasan', 'Email Atasan',
   'Disetujui Oleh', 'Disetujui Pada', 'Catatan Atasan', 'Status Email', 'ID Baris'];
 
@@ -179,6 +179,7 @@ function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
 
 /* ======================= Halaman aksi (link dari email) ======================= */
 function halamanAksi_(p) {
+  if (p.a === 'b') return halamanBatal_(p);   // pembatalan lembur oleh atasan / owner (Batal.gs)
   const aksi = p.a, id = p.id, sig = p.s;
   let isi;
   try {
@@ -210,6 +211,9 @@ function halamanAksi_(p) {
   } catch (e) {
     isi = '<h2>Tidak dapat dibuka</h2><div class="msg err">' + escH_(e.message) + '</div>';
   }
+  return halamanHtml_(isi);
+}
+function halamanHtml_(isi) {
   const html = '<!DOCTYPE html><html><head><base target="_top"><meta charset="utf-8"><style>' +
     'body{margin:0;font-family:Arial,sans-serif;font-size:14px;background:#F5F5F6;color:#222}' +
     'header{background:#fff;border-bottom:4px solid #BE353F;padding:10px 16px}header img{height:42px;max-width:100%}' +
@@ -349,7 +353,8 @@ function hapusPdfLama_(url) {
  *  PDF dibuat setelah semua karyawan di rekap itu selesai diproses. Bila ada surat susulan di
  *  tanggal yang sama setelah PDF terbentuk, PDF lama dihapus & PDF baru dibuat + dikirim ulang.
  */
-function rekapSPL_(nomor, paksa) {
+function rekapSPL_(nomor, paksa, sudah) {
+  sudah = sudah || {};
   const S = bacaBaris_('SPL');
   const r0 = S.rows.find(r => r['Nomor SPL'] === nomor);
   if (!r0) return 'Nomor ' + nomor + ' tidak ditemukan.';
@@ -361,7 +366,8 @@ function rekapSPL_(nomor, paksa) {
   // 1. rekap admin pembuat surat ini
   const em = String(r0['Email Pembuat']).toLowerCase();
   const milik = hari.filter(r => String(r['Email Pembuat']).toLowerCase() === em);
-  if (paksa || (fin(milik) && milik.some(r => !r['Link PDF']))) {
+  if (!sudah['adm:' + em] && (paksa || (fin(milik) && milik.some(r => !r['Link PDF'])))) {
+    sudah['adm:' + em] = 1;
     const lama = [...new Set(milik.map(r => r['Link PDF']).filter(Boolean))];
     const pdf = buatPdfSPL_(milik, { estimasi: false, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - ' + r0['Dibuat Oleh'] });
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
@@ -374,13 +380,14 @@ function rekapSPL_(nomor, paksa) {
 
   // 2. rekap owner (semua admin) — setelah seluruh surat di tanggal itu selesai
   const own = owner_();
-  if (own.length && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
+  if (own.length && !sudah.owner && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
+    sudah.owner = 1;
     const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
     const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     hari.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Owner': file.getUrl() }));
-    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true);
+    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true, 'O.' + own[0].id + '.' + tgl);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP OWNER DIPERBARUI' : 'PDF REKAP OWNER', own.map(o => o.email).join(','), file.getUrl());
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
@@ -391,13 +398,14 @@ function rekapSPL_(nomor, paksa) {
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = atasanDari(r); if (a && idOwner.indexOf(a.id) < 0) daftarAtasan[a.id] = a; });
   Object.values(daftarAtasan).forEach(a => {
     const grp = hari.filter(r => { const x = atasanDari(r); return x && x.id === a.id; });
-    if (!grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
+    if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
+    sudah['ats:' + a.id] = 1;
     const lama = [...new Set(grp.map(r => r['Link PDF Atasan']).filter(Boolean))];
     const pdf = buatPdfSPL_(grp, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Atasan ' + a.nama });
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     grp.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Atasan': file.getUrl() }));
-    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + a.nama, true);
+    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + a.nama, true, 'A.' + a.id + '.' + tgl);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ATASAN DIPERBARUI' : 'PDF REKAP ATASAN', a.email, file.getUrl());
     hasil.push('PDF rekap atasan dikirim ke ' + a.nama);
   });
@@ -405,7 +413,7 @@ function rekapSPL_(nomor, paksa) {
 }
 function tglFile_(r) { return Utilities.formatDate(r['Tanggal Lembur'], TZ, 'dd-MM-yyyy'); }
 
-function kirimRekap_(ke, rows, file, pdf, revisi, label, owner) {
+function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId) {
   const r0 = rows[0], ok = rows.filter(r => r['Status'] === ST.SETUJU);
   const tgl = r0['Hari'] + ', ' + tglIndo_(r0['Tanggal Lembur']);
   const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
@@ -417,7 +425,9 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner) {
     ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> lembur, total ' + String(ok.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0)).replace('.', ',') + ' jam' +
     (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
     (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
-    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
+    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>' +
+    (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
+      tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '');
   return kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);
 }
 
@@ -465,6 +475,9 @@ function buatPdfSPL_(rows, opt) {
     isi.map(x => '<td style="padding:5px;border:1px solid #BBB;text-align:' + x[1] + ';font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + x[0] + '</td>').join('') +
     (sisa ? '<td colspan="' + sisa + '" style="border:1px solid #BBB;background:#EFF0F2"></td>' : '') + '</tr>';
   const persetujuan = r => {
+    if (r['Status'] === ST.BATAL)
+      return '<b style="color:#888">DIBATALKAN</b>' + (r['Dibatalkan Oleh'] ? '<br>oleh ' + escH_(r['Dibatalkan Oleh']) + '<br><span style="color:#777">' + waktuIndo_(r['Dibatalkan Pada']) + '</span>' : '') +
+        (r['Alasan Pembatalan'] ? '<br><i>' + escH_(r['Alasan Pembatalan']) + '</i>' : '');
     if (r['Status'] === ST.SETUJU || r['Status'] === ST.TOLAK)
       return '<b style="color:' + (WARNA_ST_[r['Status']] || '#222') + '">' + escH_(r['Status']) + '</b><br>' + escH_(r['Disetujui Oleh']) +
         '<br><span style="color:#777">' + waktuIndo_(r['Disetujui Pada']) + '</span>' + (r['Catatan Atasan'] ? '<br><i>' + escH_(r['Catatan Atasan']) + '</i>' : '');

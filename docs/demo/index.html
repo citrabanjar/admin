@@ -1023,7 +1023,8 @@ function kartu(x) {
   if (x.jenis === 'SPL') {
     info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang · ' + fmtJam(x.totalJam) + ' jam';
     det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
-      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
+      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '') +
+      (o.batalOleh ? '<div class="sub" style="margin-left:12px">Dibatalkan oleh <b>' + esc(o.batalOleh) + '</b>' + (o.alasanBatal ? ' — ' + esc(o.alasanBatal) : '') + '</div>' : '')).join('<br>') +
       (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF</a>' : '');
   } else {
     info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · ' + rp(x.totalBiaya);

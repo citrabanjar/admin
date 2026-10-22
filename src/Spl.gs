@@ -100,7 +100,8 @@ function riwayatSPL(token) {
       dibuat: r['Dibuat Pada'] instanceof Date ? r['Dibuat Pada'].getTime() : 0, orang: [], totalJam: 0
     };
     g[n].orang.push({ nama: r['Full Name'], mulai: String(r['Jam Mulai']), selesai: String(r['Jam Selesai']),
-      jam: Number(r['Jam Efektif']) || 0, uraian: r['Uraian Pekerjaan'], status: r['Status'] });
+      jam: Number(r['Jam Efektif']) || 0, uraian: r['Uraian Pekerjaan'], status: r['Status'],
+      batalOleh: r['Dibatalkan Oleh'] || '', alasanBatal: r['Alasan Pembatalan'] || '' });
     g[n].totalJam += Number(r['Jam Efektif']) || 0;
   });
   return Object.values(g).map(x => {
