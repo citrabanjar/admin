@@ -494,7 +494,7 @@ function hitungSPL() {
     const LF = liburForm();
     const st = statusHari_(t, LF), hk = hariKe_(t), lib = LF[ymd_(t)];
     $('lHari').textContent = NAMA_HARI[hk - 1];
-    $('lStatus').textContent = st + (lib ? ' (' + lib + ')' : ''); $('lStatus').className = 'chip ' + (st === 'Hari Libur' ? 'libur' : 'kerja');
+    $('lStatus').textContent = st; $('lStatus').className = 'chip ' + (st === 'Hari Libur' ? 'libur' : 'kerja');
     $('lMin').textContent = (st === 'Hari Libur' ? D.P.JAM_MULAI_MIN_LIBUR : hk === 6 ? D.P.JAM_MULAI_MIN_SABTU : D.P.JAM_MULAI_MIN_SENJUM) + '  ·  selesai maks ' + D.P.JAM_SELESAI_MAKS;
   } else { $('lHari').textContent = $('lStatus').textContent = $('lMin').textContent = '–'; $('lStatus').className = 'chip'; $('lLibur').disabled = true; }
   let tot = 0, orang = 0, adaErr = false; const dipakai = {}, warnUU = [];
