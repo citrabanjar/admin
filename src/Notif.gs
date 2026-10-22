@@ -149,8 +149,9 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
 /* ======================= Instruksi KantorKu (setelah karyawan Bersedia) ======================= */
 function htmlInstruksiKantorku_() {
   const url = String(param_().URL_KANTORKU || 'https://hris.kantorku.id').trim();
-  return '<div class="instruksi">📱 Silakan lanjutkan pengajuan lembur melalui aplikasi KantorKu: ' +
-    '<a href="' + escH_(url) + '" target="_blank">' + escH_(url.replace(/^https?:\/\//, '')) + '</a></div>';
+  return '<div class="instruksi">Silakan lanjutkan pengajuan lembur melalui aplikasi KantorKu:' +
+    '<a class="kk" href="' + escH_(url) + '" target="_blank" rel="noopener">' +
+    '<img src="' + LOGO_KANTORKU_URI + '" alt="KantorKu"><span>Buka aplikasi ›</span></a></div>';
 }
 
 /* ======================= 1. Email konfirmasi ======================= */
@@ -218,7 +219,9 @@ function halamanAksi_(p) {
     'label{display:block;font-weight:bold;font-size:12px;color:#6B6F76;margin-bottom:4px}textarea{width:100%;box-sizing:border-box;font:inherit;padding:8px;border:1px solid #CBCED4;border-radius:6px}' +
     'button{margin-top:12px;background:#BE353F;color:#fff;border:0;border-radius:8px;padding:12px 26px;font-weight:bold;font-size:15px;cursor:pointer}button:disabled{background:#B9BCC2}' +
     '.instruksi{margin-top:14px;padding:14px 16px;border:1px solid #F3C9CC;background:#FFF7F7;border-radius:10px;font-size:14px;line-height:1.5}' +
-    '.instruksi a{color:#BE353F;font-weight:bold}' +
+    '.instruksi a.kk{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-top:12px;padding:10px 14px;background:#FAF8FE;border:1px solid #E3DCF5;border-radius:12px;text-decoration:none}' +
+    '.instruksi a.kk:hover{box-shadow:0 4px 14px rgba(108,58,214,.15)}.instruksi a.kk img{height:40px;display:block}' +
+    '.instruksi a.kk span{color:#6C3AD6;font-weight:bold;font-size:14px;white-space:nowrap}' +
     '.msg{padding:12px;border-radius:8px;margin-top:14px}.ok{background:#E7F5EC;color:#1E7B4A}.err{background:#FDECEA;color:#B42318}.info{background:#EFF0F2}' +
     '</style></head><body><header><img src="' + LOGO_DATA_URI + '" alt="PT Citra Banjar Abadi"></header><main><div class="card">' + isi + '</div></main></body></html>';
   return HtmlService.createHtmlOutput(html).setTitle('SPL & SPD — PT Citra Banjar Abadi')
