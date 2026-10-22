@@ -14,6 +14,7 @@ const SESI_HARI = 30;   // login form berlaku 30 hari di perangkat yang sama (OT
 /* ------------------------------ Tampilan ------------------------------ */
 function doGet(e) {
   if (e && e.parameter && e.parameter.a) return halamanAksi_(e.parameter);   // link dari email (Notif.gs)
+  if (e && e.parameter && e.parameter.api) return apiData_(e.parameter);       // data untuk pengecekan KantorKu (Api.gs)
   const t = HtmlService.createTemplateFromFile('Form');
   // rumus yang SAMA dengan server dipakai juga di browser (satu sumber rumus)
   t.rumusBersama = 'const NAMA_HARI = ' + JSON.stringify(NAMA_HARI) + ';\n' +

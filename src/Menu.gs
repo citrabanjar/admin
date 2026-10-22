@@ -16,6 +16,7 @@ function onOpen() {
     .addItem('✉ Kirim ulang email konfirmasi (SPL/SPD)', 'menuKirimUlangKonfirmasi')
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
+    .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')
     .addToUi();
 }
 

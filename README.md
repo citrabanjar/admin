@@ -14,6 +14,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 | `src/Web.gs` | Web App: tampilan, login OTP email, data form |
 | `src/Spl.gs` / `src/Spd.gs` | Simpan & riwayat SPL / SPD |
 | `src/Notif.gs` | Email konfirmasi karyawan, persetujuan atasan, PDF kop surat ke admin |
+| `src/Api.gs` | Pintu data hanya-baca (JSON) untuk pengecekan pengajuan lembur KantorKu |
 | `src/Logo.gs` | Logo perusahaan (base64) |
 | `src/Form.html` | Tampilan form |
 | `src/appsscript.json` | Manifest (zona waktu Asia/Jakarta, Web App: execute as owner, akses Anyone) |
