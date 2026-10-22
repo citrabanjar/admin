@@ -85,10 +85,10 @@ function kirimKode(email) {
   c.remove('G_' + email);
   MailApp.sendEmail({
     to: email,
-    subject: 'Kode masuk Form SPL & SPD: ' + kode,
-    htmlBody: '<div style="font-family:Arial;font-size:14px">Halo ' + k.nama + ',<br><br>Kode masuk Form SPL & SPD Anda:<br>' +
+    subject: 'Kode masuk form Anda: ' + kode,
+    htmlBody: '<div style="font-family:Arial;font-size:14px">Kode masuk form Anda:<br>' +
       '<div style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:12px 0;color:#BE353F">' + kode + '</div>' +
-      'Berlaku 10 menit. Abaikan email ini jika Anda tidak meminta kode.<br><br>— ' + (param_().NAMA_PERUSAHAAN || '') + '</div>'
+      'Admin PT. Citra Banjar Abadi</div>'
   });
   return 'Kode dikirim ke ' + email.replace(/^(.{2}).*(@.*)$/, '$1•••$2');
 }

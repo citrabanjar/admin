@@ -147,7 +147,7 @@ window.SERVER={
 <main>
   <!-- ================= LOGIN ================= -->
   <div id="vLogin" class="card login hide">
-    <h3 style="margin-top:0;color:var(--char)">Masuk — Form SPL & SPD</h3>
+    <h3 style="margin-top:0;color:var(--char)">Masuk Form</h3>
     <p class="sub" style="font-size:13px">Masukkan email Anda yang terdaftar. Kode masuk 6 angka akan dikirim ke email tersebut.</p>
     <div id="lStep1">
       <label>Email</label>
@@ -211,9 +211,9 @@ window.SERVER={
       <div class="card" style="padding:0">
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Jam Mulai</th><th>Jam Selesai</th>
-            <th>Istirahat</th><th>Jam Efektif</th><th>Estimasi Kompensasi</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
+            <th>Istirahat</th><th>Jam Efektif</th><th style="min-width:220px">Uraian Pekerjaan</th><th></th></tr></thead>
           <tbody id="lRows"></tbody>
-          <tfoot><tr><td colspan="5" style="text-align:right">TOTAL JAM LEMBUR</td><td id="lTot" style="text-align:center">0</td><td id="lKompTot" class="uang">-</td><td colspan="2"></td></tr></tfoot>
+          <tfoot><tr><td colspan="5" style="text-align:right">TOTAL JAM LEMBUR</td><td id="lTot" style="text-align:center">0</td><td colspan="2"></td></tr></tfoot>
         </table>
       </div>
       <div class="bar">
@@ -590,7 +590,7 @@ function splTambah() {
     '<td data-l="Karyawan">' + htmlCariKaryawan('hitungSPL') + '<div class="sub jab"></div><div class="rowerr"></div><div class="rowwarn"></div></td>' +
     '<td class="half" data-l="Jam Mulai"><select class="m" onchange="hitungSPL()"></select></td>' +
     '<td class="half" data-l="Jam Selesai"><select class="s" onchange="hitungSPL()"></select></td>' +
-    '<td class="auto ist" data-l="Istirahat">-</td><td class="auto ef" data-l="Jam Efektif">-</td><td class="auto uang komp" data-l="Estimasi Kompensasi">-</td>' +
+    '<td class="auto ist" data-l="Istirahat">-</td><td class="auto ef" data-l="Jam Efektif">-</td>' +
     '<td data-l="Uraian Pekerjaan"><textarea class="u" rows="2" placeholder="Contoh: Welding frame project X" oninput="hitungSPL()"></textarea></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="splHapus(' + id + ')">✕</button></td>';
   $('lRows').appendChild(tr); LROWS.push({ id: id, el: tr });
@@ -652,47 +652,8 @@ function hitungSPL() {
   pesan('lInfo', 'warn', warnUU.length ? '⚠ Perusahaan melanggar UU Ketenagakerjaan karena mempekerjakan karyawan melebihi batas (' + esc(warnUU.join(', ')) + ').' : '');
   SPL_OK = !adaErr && orang > 0 && !!tgl;
   $('lKirim').disabled = !SPL_OK;
-  jadwalEstimasi();
 }
 
-/* ===== estimasi kompensasi =====
-   Dihitung di server, tapi hasil disimpan per kombinasi (tanggal|libur|karyawan|mulai|selesai).
-   Server hanya dipanggil untuk baris yang kombinasinya belum pernah dihitung. */
-let ESTC = {}, ctxEst = '';
-let tEst = null;
-function kunciEst(d, r) {
-  const id = r.querySelector('.k').value, m = r.querySelector('.m').value, s = r.querySelector('.s').value;
-  return d.tanggal && id && m && s ? [d.tanggal, d.liburNasional ? 1 : 0, id, m, s].join('|') : '';
-}
-function tampilEst() {
-  const d = splData(); let tot = 0, ada = false;
-  LROWS.forEach(r => {
-    const k = kunciEst(d, r.el), c = r.el.querySelector('.komp'), v = k ? ESTC[k] : undefined;
-    c.textContent = !k ? '-' : v === undefined ? '…' : v === null ? '-' : rp(v);
-    if (k && v) { tot += v; ada = true; }
-  });
-  $('lKompTot').textContent = ada ? rp(tot) : '-';
-}
-function jadwalEstimasi() {
-  // tanggal lembur atau centang libur berubah → semua baris dihitung ulang dari server
-  const d0 = splData(), ctx = d0.tanggal + '|' + (d0.liburNasional ? 1 : 0);
-  if (ctx !== ctxEst) { ESTC = {}; ctxEst = ctx; }
-  tampilEst();
-  clearTimeout(tEst);
-  tEst = setTimeout(async () => {
-    const d = splData(), perlu = {}, baris = [];
-    LROWS.forEach(r => {
-      const k = kunciEst(d, r.el);
-      if (k && !(k in ESTC) && !perlu[k]) { perlu[k] = 1; const p = k.split('|'); baris.push({ id: p[2], mulai: p[3], selesai: p[4], _k: k }); }
-    });
-    if (!baris.length) return;                 // semua sudah ada di simpanan → tidak perlu ke server
-    try {
-      const h = await run('estimasiSPL', TOKEN, { tanggal: d.tanggal, liburNasional: d.liburNasional, baris: baris });
-      baris.forEach((b, i) => ESTC[b._k] = h[i]);
-      tampilEst();
-    } catch (e) { sesiHabis(e); }
-  }, 400);
-}
 function splData() {
   return { tanggal: $('lTgl').value, liburNasional: $('lLibur').checked && !$('lLibur').disabled,
     baris: LROWS.map(r => ({ id: r.el.querySelector('.k').value, mulai: r.el.querySelector('.m').value, selesai: r.el.querySelector('.s').value, uraian: r.el.querySelector('.u').value })).filter(b => b.id) };

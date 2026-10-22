@@ -540,10 +540,10 @@ function kirimKode(email) {
   c.remove('G_' + email);
   MailApp.sendEmail({
     to: email,
-    subject: 'Kode masuk Form SPL & SPD: ' + kode,
-    htmlBody: '<div style="font-family:Arial;font-size:14px">Halo ' + k.nama + ',<br><br>Kode masuk Form SPL & SPD Anda:<br>' +
+    subject: 'Kode masuk form Anda: ' + kode,
+    htmlBody: '<div style="font-family:Arial;font-size:14px">Kode masuk form Anda:<br>' +
       '<div style="font-size:28px;font-weight:bold;letter-spacing:6px;margin:12px 0;color:#BE353F">' + kode + '</div>' +
-      'Berlaku 10 menit. Abaikan email ini jika Anda tidak meminta kode.<br><br>— ' + (param_().NAMA_PERUSAHAAN || '') + '</div>'
+      'Admin PT. Citra Banjar Abadi</div>'
   });
   return 'Kode dikirim ke ' + email.replace(/^(.{2}).*(@.*)$/, '$1•••$2');
 }
@@ -720,18 +720,6 @@ function catatLibur_(tglStr, oleh) {
   if (liburSet_()[tglStr]) return;
   sheet_(SH.LIBUR).appendRow([Utilities.parseDate(tglStr + ' 00:00', TZ, 'yyyy-MM-dd HH:mm'), '', 'Libur nasional (ditandai ' + oleh + ' via form SPL)']);
   _L = null;
-}
-
-/** Estimasi kompensasi per baris (dihitung di server — gaji tidak dikirim ke browser). */
-function estimasiSPL(token, data) {
-  sesiCek_(token);
-  const P = param_(), K = karyawan_(), L = liburEfektif_(data && data.tanggal, data && data.liburNasional);
-  return ((data && data.baris) || []).map(b => {
-    const k = K[String(b.id || '').toUpperCase()];
-    if (!k || !b.mulai || !b.selesai || !data.tanggal) return null;
-    const h = hitungLembur_({ tanggal: data.tanggal, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
-    return h.error.length ? null : h.kompensasi;
-  });
 }
 
 /** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
@@ -982,7 +970,7 @@ function kirimEmail_(ke, subjek, isiHtml, cc, lampiran) {
   try {
     if (!ke) return 'tanpa email';
     if (MailApp.getRemainingDailyQuota() < 1) return 'kuota email harian habis';
-    const opt = { to: ke, subject: subjek, name: 'Sistem SPL & SPD ' + (param_().NAMA_PERUSAHAAN || ''),
+    const opt = { to: ke, subject: subjek,
       htmlBody: bungkusEmail_(isiHtml), inlineImages: { logo: logoBlob_() } };
     if (cc) opt.cc = cc;
     if (lampiran) opt.attachments = [lampiran];
@@ -994,21 +982,22 @@ function bungkusEmail_(isi) {
   return '<div style="font-family:Arial,sans-serif;font-size:14px;color:#222;max-width:600px">' +
     '<div style="border-bottom:4px solid #BE353F;padding:8px 0 10px"><img src="cid:logo" alt="PT Citra Banjar Abadi" style="height:44px"></div>' +
     '<div style="padding:16px 0">' + isi + '</div>' +
-    '<div style="font-size:11px;color:#888;border-top:1px solid #eee;padding-top:8px">Email otomatis dari Sistem SPL & SPD. Mohon tidak membalas email ini.</div></div>';
+    '<div style="font-size:11px;color:#888;border-top:1px solid #eee;padding-top:8px">Admin PT. Citra Banjar Abadi — email otomatis, mohon tidak membalas email ini.</div></div>';
 }
 function tombol_(href, teks, warna) {
   return '<a href="' + href + '" style="display:inline-block;background:' + warna + ';color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;margin:4px 8px 4px 0">' + teks + '</a>';
 }
-function tabelDetail_(jenis, r, I) {
+function tabelDetail_(jenis, r, I, denganKompensasi) {
   const baris = jenis === 'SPL' ? [
     ['Nomor SPL', r['Nomor SPL']],
     ['Tanggal Lembur', r['Hari'] + ', ' + tglIndo_(r['Tanggal Lembur']) + ' (' + r['Status Hari'] + ')'],
     ['Karyawan', r['Full Name'] + ' (' + r['Employee ID'] + ')'],
     ['Jam Lembur', r['Jam Mulai'] + ' – ' + r['Jam Selesai'] + (r['Istirahat'] && r['Istirahat'] !== '-' ? ' (istirahat ' + r['Istirahat'] + ')' : '')],
     ['Jam Efektif', String(r['Jam Efektif']).replace('.', ',') + ' jam'],
-    ['Uraian Pekerjaan', r['Uraian Pekerjaan']],
+    ['Uraian Pekerjaan', r['Uraian Pekerjaan']]
+  ].concat(denganKompensasi ? [['Estimasi Kompensasi', rpH_(r['Estimasi Kompensasi'])]] : [], [
     ['Diperintahkan oleh', r['Dibuat Oleh']]
-  ] : [
+  ]) : [
     ['Nomor SPD', r['Nomor SPD']],
     ['Maksud / Tujuan', I['Maksud / Tujuan']],
     ['Tempat Tujuan', I['Tempat Tujuan']],
@@ -1038,7 +1027,7 @@ function kirimKonfirmasi_(jenis, nomor) {
     const isi = (keAdmin
       ? '<p><b>' + escH_(r['Full Name']) + '</b> belum memiliki email di sistem. Mohon konfirmasi kesediaan ' + J.kata.toLowerCase() + ' <b>atas nama karyawan tersebut</b>:</p>'
       : '<p>Yth. <b>' + escH_(r['Full Name']) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>') +
-      tabelDetail_(jenis, r, Ir) + '<p style="margin-top:18px">' +
+      tabelDetail_(jenis, r, Ir, true) + '<p style="margin-top:18px">' +
       tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
     const err = kirimEmail_(keAdmin ? Ir['Email Pembuat'] : k.email,
       'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + r['Full Name'] : ''), isi);
@@ -1221,14 +1210,16 @@ function buatPdfSPL_(rows) {
   const isiTabel = rows.map((r, i) => '<tr>' +
     tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') +
     tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
-    tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') + tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(selStatus_(r)) + tdP_(selAtasan_(r)) + '</tr>').join('');
+    tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') + tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') +
+    tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(selStatus_(r)) + tdP_(selAtasan_(r)) + '</tr>').join('');
+  const totKomp = setuju.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0);
   const html = '<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
     kopPdf_('SURAT PERINTAH LEMBUR (SPL)', r0['Nomor SPL']) +
     '<table style="font-size:10px;margin-bottom:8px"><tr><td style="width:110px">Tanggal Lembur</td><td>: <b>' + escH_(r0['Hari']) + ', ' + tglIndo_(r0['Tanggal Lembur']) + '</b></td></tr>' +
     '<tr><td>Status Hari</td><td>: ' + escH_(r0['Status Hari']) + '</td></tr><tr><td>Dibuat oleh</td><td>: ' + escH_(r0['Dibuat Oleh']) + ' — ' + waktuIndo_(r0['Dibuat Pada']) + '</td></tr></table>' +
-    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Mulai', 'Selesai', 'Istirahat', 'Jam Efektif', 'Uraian Pekerjaan', 'Status', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' + isiTabel +
+    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Mulai', 'Selesai', 'Istirahat', 'Jam Efektif', 'Estimasi Kompensasi', 'Uraian Pekerjaan', 'Status', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' + isiTabel +
     '<tr><td colspan="6" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL JAM LEMBUR DISETUJUI (' + setuju.length + ' dari ' + rows.length + ' karyawan)</td>' +
-    '<td style="padding:5px;border:1px solid #BBB;text-align:center;font-weight:bold;font-size:9px;background:#EFF0F2">' + String(totJam).replace('.', ',') + '</td><td colspan="3" style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
+    '<td style="padding:5px;border:1px solid #BBB;text-align:center;font-weight:bold;font-size:9px;background:#EFF0F2">' + String(totJam).replace('.', ',') + '</td><td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + rpH_(totKomp) + '</td><td colspan="3" style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
     '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL ' + escH_(P.NAMA_PERUSAHAAN || '') +
     '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(r0['Dibuat Oleh'], 'Admin') + '</body></html>';
   return pdfDari_(html, 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(r0['Tanggal Lembur'], TZ, 'dd-MM-yyyy') + ').pdf');

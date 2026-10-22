@@ -86,18 +86,6 @@ function catatLibur_(tglStr, oleh) {
   _L = null;
 }
 
-/** Estimasi kompensasi per baris (dihitung di server — gaji tidak dikirim ke browser). */
-function estimasiSPL(token, data) {
-  sesiCek_(token);
-  const P = param_(), K = karyawan_(), L = liburEfektif_(data && data.tanggal, data && data.liburNasional);
-  return ((data && data.baris) || []).map(b => {
-    const k = K[String(b.id || '').toUpperCase()];
-    if (!k || !b.mulai || !b.selesai || !data.tanggal) return null;
-    const h = hitungLembur_({ tanggal: data.tanggal, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
-    return h.error.length ? null : h.kompensasi;
-  });
-}
-
 /** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
 function riwayatSPL(token) {
   const u = sesiCek_(token);
