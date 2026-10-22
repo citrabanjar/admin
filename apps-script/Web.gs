@@ -8,7 +8,7 @@
  */
 
 const PERAN_PEMBUAT = ['ADMIN'];
-const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN'];
+const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN', 'TIDAK BERSEDIA'];
 const SESI_DETIK = 6 * 3600;   // login berlaku 6 jam
 
 /* ------------------------------ Tampilan ------------------------------ */
@@ -167,7 +167,7 @@ function suratAktif_(dari, sampai) {
         ymd_(b) <= sampai && dari <= ymd_(k)) spdAktif[r['Nomor SPD']] = true;
   });
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    if (spdAktif[r['Nomor SPD']]) out.spd[String(r['Employee ID']).toUpperCase()] = r['Nomor SPD'];
+    if (spdAktif[r['Nomor SPD']] && STATUS_BATAL.indexOf(String(r['Status'] || '')) < 0) out.spd[String(r['Employee ID']).toUpperCase()] = r['Nomor SPD'];
   });
   return out;
 }

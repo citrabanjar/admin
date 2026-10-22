@@ -30,5 +30,5 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 - [x] Tahap 2–3 — Form SPL & SPD (logo perusahaan), nomor otomatis, simpan
 - [x] Tahap 4 — Email SPL: konfirmasi karyawan → persetujuan atasan langsung → PDF ke admin
 - [x] Tahap 5 — PDF SPL dengan kop surat (otomatis saat semua karyawan selesai diproses)
-- [ ] Email & PDF untuk SPD
+- [x] Email & PDF untuk SPD (alur sama dengan SPL, PDF mengikuti formulir Excel A–F)
 - [ ] Tahap 6 — Panel admin & rekap

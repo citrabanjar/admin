@@ -583,7 +583,7 @@ async function spdKirim() {
 
 function sukses(jenis, nomor, ringkas, status, warn) {
   modal('<h3 style="margin-top:0;color:var(--ok)">✅ ' + jenis + ' tersimpan</h3>' +
-    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + (jenis === 'SPL' ? '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) sedang dikirim ke tiap karyawan.</p>' : '') +
+    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) sudah dikirim ke tiap ' + (jenis === 'SPL' ? 'karyawan' : 'personel') + '.</p>' +
     (warn.length ? '<div class="msg warn">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</div>' : '') +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal();buka(\'riwayat\')">Lihat riwayat</button>' +
     '<button class="btn" onclick="tutupModal();buka(\'home\')">Selesai</button></div>');
@@ -611,7 +611,9 @@ function kartu(x) {
       (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF SPL</a>' : '');
   } else {
     info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · ' + rp(x.totalBiaya);
-    det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '')).join('<br>');
+    det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '') +
+      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
+      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF SPD</a>' : '');
   }
   return '<div class="rw" onclick="this.classList.toggle(\'buka\')"><div class="bar" style="margin:0"><div><span class="jn ' + x.jenis + '">' + x.jenis + '</span><b>' + esc(x.nomor) +
     '</b><div class="sub">' + info + '</div></div><span class="st ' + esc(kelas) + '">' + esc(x.status) + '</span></div><div class="det">' + det + '</div></div>';

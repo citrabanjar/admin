@@ -15,8 +15,10 @@
  */
 function simpanSPD(token, d) {
   const u = sesiCek_(token);
+  pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba simpan lagi beberapa detik lagi.');
+  let hasilSimpan;
   try {
     _K = null; _P = null;
     const P = param_(), K = karyawan_(), pil = pilihan_();
@@ -57,8 +59,7 @@ function simpanSPD(token, d) {
     }
     if (err.length) return { ok: false, error: err };
 
-    // SPD: belum ada alur email/persetujuan (menyusul) — status awal TERSIMPAN
-    const alur = { status: 'TERSIMPAN' };
+    const alur = { status: 'PROSES 0/' + personel.length };
     const tp = s => Utilities.parseDate(s + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
     const tglSurat = tp(d.tanggalSurat);
     const nomor = nomorBerikutnya_('SPD', tglSurat);
@@ -76,11 +77,12 @@ function simpanSPD(token, d) {
       'Status': alur.status,
       'Diketahui Oleh': alur.diketahuiOleh || '', 'Diketahui Pada': alur.diketahuiOleh ? now : '',
       'Catatan': [].concat(warn, alur.catatan ? [alur.catatan] : []).join(' | '),
-      'Status Email': 'Belum dikirim'
+      'Status Email': 'Konfirmasi dikirim ke personel'
     }]);
     tulisBaris_(SH.PERSONEL, h.personel.map((p, i) => ({
       'Nomor SPD': nomor, 'No': i + 1, 'Employee ID': p.id, 'Full Name': K[p.id].nama, 'Job Position': K[p.id].jabatan,
-      'Lama (hari)': Number(p.lama), 'Uang Saku': p.uangSaku, 'Keterangan': teks(p.keterangan)
+      'Lama (hari)': Number(p.lama), 'Uang Saku': p.uangSaku, 'Keterangan': teks(p.keterangan),
+      'Status': ST.KONFIRMASI, 'Status Email': 'Mengirim…', 'ID Baris': Utilities.getUuid().slice(0, 8)
     })));
     tulisBaris_(SH.BIAYA, biaya.map((b, i) => ({
       'Nomor SPD': nomor, 'No': i + 1, 'Jenis Biaya': teks(b.jenis), 'Uraian': teks(b.uraian),
@@ -89,10 +91,12 @@ function simpanSPD(token, d) {
     SpreadsheetApp.flush();
 
     logAksi_('SPD', nomor, 'DIBUAT', u.email, personel.length + ' personel, ' + h.lama + ' hari ke ' + teks(d.tempat) + ', total Rp' + h.totalBiaya + ' → ' + alur.status);
-    return { ok: true, nomor: nomor, jumlah: personel.length, lama: h.lama, totalBiaya: h.totalBiaya, status: alur.status, peringatan: warn };
+    hasilSimpan = { ok: true, nomor: nomor, jumlah: personel.length, lama: h.lama, totalBiaya: h.totalBiaya, status: ST.KONFIRMASI, peringatan: warn };
   } finally {
     lock.releaseLock();
   }
+  try { kirimKonfirmasi_('SPD', hasilSimpan.nomor); } catch (e) { logAksi_('SPD', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  return hasilSimpan;
 }
 
 /** Riwayat SPD buatan user (30 terakhir). */
@@ -100,7 +104,7 @@ function riwayatSPD(token) {
   const u = sesiCek_(token);
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'] });
+    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });
   });
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Email Pembuat']).toLowerCase() === u.email)
@@ -112,7 +116,7 @@ function riwayatSPD(token) {
       lama: Number(r['Lama (hari)']) || 0, tempat: r['Tempat Tujuan'], maksud: r['Maksud / Tujuan'],
       totalBiaya: Number(r['Total Biaya']) || 0,
       dibuat: r['Dibuat Pada'] instanceof Date ? r['Dibuat Pada'].getTime() : 0,
-      orang: per[r['Nomor SPD']] || []
+      orang: per[r['Nomor SPD']] || [], pdf: r['Link PDF'] || ''
     }))
     .sort((a, b) => b.dibuat - a.dibuat).slice(0, 30);
 }

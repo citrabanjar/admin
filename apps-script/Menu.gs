@@ -13,8 +13,8 @@ function onOpen() {
     .addSeparator()
     .addItem('🔗 Link form SPL & SPD', 'bukaForm')
     .addSeparator()
-    .addItem('✉ Kirim ulang email konfirmasi SPL', 'menuKirimUlangKonfirmasi')
-    .addItem('📄 Buat & kirim PDF SPL sekarang', 'menuPdfSPL')
+    .addItem('✉ Kirim ulang email konfirmasi (SPL/SPD)', 'menuKirimUlangKonfirmasi')
+    .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addToUi();
 }
@@ -62,6 +62,7 @@ function setupAwal() {
   }
   // Kolom tambahan Data SPL untuk alur email
   pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
+  pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
   rahasia_();
 
   logAksi_('-', '-', 'SETUP AWAL', Session.getActiveUser().getEmail(), 'Zona waktu ' + TZ + ', proteksi sheet sistem.');
