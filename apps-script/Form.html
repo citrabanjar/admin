@@ -532,7 +532,7 @@ function hitungSPL() {
 /* ===== estimasi kompensasi =====
    Dihitung di server, tapi hasil disimpan per kombinasi (tanggal|libur|karyawan|mulai|selesai).
    Server hanya dipanggil untuk baris yang kombinasinya belum pernah dihitung. */
-const ESTC = {};
+let ESTC = {}, ctxEst = '';
 let tEst = null;
 function kunciEst(d, r) {
   const id = r.querySelector('.k').value, m = r.querySelector('.m').value, s = r.querySelector('.s').value;
@@ -548,6 +548,9 @@ function tampilEst() {
   $('lKompTot').textContent = ada ? rp(tot) : '-';
 }
 function jadwalEstimasi() {
+  // tanggal lembur atau centang libur berubah → semua baris dihitung ulang dari server
+  const d0 = splData(), ctx = d0.tanggal + '|' + (d0.liburNasional ? 1 : 0);
+  if (ctx !== ctxEst) { ESTC = {}; ctxEst = ctx; }
   tampilEst();
   clearTimeout(tEst);
   tEst = setTimeout(async () => {
