@@ -9,7 +9,7 @@
 
 const PERAN_PEMBUAT = ['ADMIN'];
 const STATUS_BATAL = ['DITOLAK', 'DIBATALKAN', 'TIDAK BERSEDIA'];
-const SESI_DETIK = 6 * 3600;   // login berlaku 6 jam
+const SESI_HARI = 30;   // login form berlaku 30 hari di perangkat yang sama (OTP hanya saat login pertama)
 
 /* ------------------------------ Tampilan ------------------------------ */
 function doGet(e) {
@@ -43,18 +43,26 @@ function pembuatByEmail_(email) {
   return (k && k.aktif && PERAN_PEMBUAT.indexOf(k.peran) >= 0) ? k : null;
 }
 function infoUser_(k) { return { nama: k.nama, jabatan: k.jabatan, departemen: k.departemen, peran: k.peran, email: k.email }; }
+/** Sesi login disimpan di Script Properties (bertahan 30 hari, tidak hilang seperti cache). */
 function sesiBuat_(email) {
-  const tok = Utilities.getUuid();
-  CacheService.getScriptCache().put('S_' + tok, email, SESI_DETIK);
+  const tok = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
+  const P = PropertiesService.getScriptProperties();
+  P.setProperty('S_' + tok, JSON.stringify({ e: email, x: Date.now() + SESI_HARI * 864e5 }));
+  // bersihkan sesi kedaluwarsa
+  const semua = P.getProperties(), kini = Date.now();
+  Object.keys(semua).forEach(k => { if (k.indexOf('S_') === 0) { try { if (JSON.parse(semua[k]).x < kini) P.deleteProperty(k); } catch (e) { P.deleteProperty(k); } } });
   return tok;
 }
 function sesiCek_(tok) {
-  const email = tok ? CacheService.getScriptCache().get('S_' + tok) : null;
-  if (!email) throw new Error('SESI_HABIS');
-  const k = pembuatByEmail_(email);
+  let s = null;
+  try { s = tok ? JSON.parse(PropertiesService.getScriptProperties().getProperty('S_' + tok) || 'null') : null; } catch (e) {}
+  if (!s || s.x < Date.now()) throw new Error('SESI_HABIS');
+  const k = pembuatByEmail_(s.e);
   if (!k) throw new Error('Akun ini tidak berhak membuat SPL / SPD.');
   return k;
 }
+/** Keluar: hapus sesi di server */
+function keluarSesi(tok) { if (tok) PropertiesService.getScriptProperties().deleteProperty('S_' + tok); return true; }
 
 /** Jika form dibuka dengan akun Google yang emailnya terdaftar (umumnya Google Workspace), langsung masuk. */
 function loginOtomatis() {

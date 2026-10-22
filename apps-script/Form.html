@@ -341,7 +341,7 @@ async function masukDengan(tok) {
   splBaru(); spdBaru();
   tampil('vApp'); buka('home');
 }
-function keluar() { simpanToken(null); TOKEN = null; $('userBox').classList.add('hide'); ulangLogin(); tampil('vLogin'); }
+function keluar() { try { if (TOKEN) google.script.run.keluarSesi(TOKEN); } catch (e) {} simpanToken(null); TOKEN = null; $('userBox').classList.add('hide'); ulangLogin(); tampil('vLogin'); }
 function sesiHabis(e) {
   if (errText(e).indexOf('SESI_HABIS') >= 0) { keluar(); pesan('lMsg', 'warn', 'Sesi berakhir, silakan masuk lagi.'); return true; }
   return false;

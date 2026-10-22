@@ -404,7 +404,7 @@ function buatPdfSPD_(I, rows) {
     '<table style="width:100%;border-collapse:collapse;font-size:9px"><tr>' + ['TIBA DI TEMPAT TUJUAN', 'BERANGKAT DARI TEMPAT TUJUAN'].map(t =>
       '<td style="width:50%;border:1px solid #BBB;padding:6px;vertical-align:top"><b>' + t + '</b><br><br>Tempat : ............................<br><br>Tanggal : ............................<br><br>Jam : ............................' +
       '<div style="height:50px"></div><div style="text-align:center;color:#555">( Nama, Tanda Tangan & Stempel Instansi )</div></td>').join('') + '</tr></table>' +
-    '<p style="text-align:right;font-size:10px;margin-top:12px">Dikeluarkan di : ' + escH_(P.KOTA_SURAT || '') + ', ' + tglIndo_(I['Tanggal Surat']) + '</p>' +
+    '<p style="text-align:right;font-size:10px;margin-top:12px">Dikeluarkan di : ' + (P.KOTA_SURAT ? escH_(P.KOTA_SURAT) + ', ' : '') + tglIndo_(I['Tanggal Surat']) + '</p>' +
     ttdPdf_(I['Dibuat Oleh'], 'Admin').replace('Manager Departemen', 'Manager Departemen') +
     '<p style="font-size:8px;color:#777;margin-top:8px">Konfirmasi personel dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL & SPD. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' +
     '</body></html>';
