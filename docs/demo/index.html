@@ -9,6 +9,7 @@ window.google={script:{get run(){return mkRun()}}};
 const RW_SPL=[{jenis:'SPL',nomor:'001 / SPL / CBA / X / 2026',tanggal:'2026-10-21',hari:'Rabu',statusHari:'Hari Kerja',status:'MENUNGGU MANAGER',dibuat:1,orang:[{nama:'BUDI SANTOSO',mulai:'16:00',selesai:'22:00',jam:5,uraian:'Welding frame project X'}],totalJam:5}];
 const RW_SPD=[{jenis:'SPD',nomor:'001 / SPD / CBA / X / 2026',status:'DISETUJUI',tanggal:'2026-10-20',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,tempat:'Cilegon',maksud:'Survey lokasi proyek',totalBiaya:600000,dibuat:0,orang:[{nama:'RINA MARLINA',lama:3,keterangan:''}]}];
 let nSPL=1,nSPD=1;
+let OPENS=[{nomor:'001 / SPD / CBA / X / 2026',tempat:'Cilegon',maksud:'Survey lokasi proyek',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,transportasi:'Kendaraan Dinas',customer:'PT X',selesaiApproval:true,uangSakuRencana:300000,biayaRencana:150000,personel:[{id:'K004',nama:'RINA MARLINA',jabatan:'STAFF',lama:3,status:'DISETUJUI'},{id:'K005',nama:'HENDRA WIJAYA',jabatan:'STAFF',lama:3,status:'TIDAK BERSEDIA'}],biaya:[{jenis:'Konsumsi',uraian:'Makan',jumlah:150000,bukti:'Ada'}]},{nomor:'002 / SPD / CBA / X / 2026',tempat:'Bandung',maksud:'Instalasi',berangkat:'2026-11-02',kembali:'2026-11-03',lama:2,selesaiApproval:false,uangSakuRencana:0,biayaRencana:0,personel:[{id:'K001',nama:'BUDI SANTOSO',lama:2,status:'MENUNGGU KONFIRMASI'}],biaya:[]}];
 const dataP={JAM_MULAI_MIN_SENJUM:'16:00',JAM_MULAI_MIN_SABTU:'13:00',JAM_MULAI_MIN_LIBUR:'08:00',JAM_SELESAI_MAKS:'24:00',ISTIRAHAT_HARI_KERJA:'18:00-19:00',ISTIRAHAT_HARI_LIBUR:'12:00-13:00',BATAS_SELESAI_LIBUR:'18:00',PEMBAGI_TARIF:173,FAKTOR_HARI_KERJA:1.5,FAKTOR_HARI_LIBUR:2};
 window.SERVER={
  loginOtomatis:()=>({token:null}),
@@ -23,7 +24,9 @@ window.SERVER={
  simpanSPL:(t,d)=>{window.TERKIRIM=d;const no=String(++nSPL).padStart(3,'0')+' / SPL / CBA / X / 2026';RW_SPL.unshift({jenis:'SPL',nomor:no,tanggal:d.tanggal,hari:'-',statusHari:'-',status:'MENUNGGU MANAGER',dibuat:Date.now(),orang:d.baris.map(b=>({nama:b.id,mulai:b.mulai,selesai:b.selesai,jam:0,uraian:b.uraian})),totalJam:0});return {ok:true,nomor:no,jumlah:d.baris.length,totalJam:0,status:'MENUNGGU MANAGER'}},
  simpanSPD:(t,d)=>{window.TERKIRIM_SPD=d;const no=String(++nSPD).padStart(3,'0')+' / SPD / CBA / X / 2026';RW_SPD.unshift({jenis:'SPD',nomor:no,status:'MENUNGGU MANAGER',tanggal:d.tanggalSurat,berangkat:d.berangkat,kembali:d.kembali,tempat:d.tempat,maksud:d.maksud,totalBiaya:0,dibuat:Date.now(),orang:d.personel.map(p=>({nama:p.id,lama:p.lama,keterangan:p.keterangan}))});return {ok:true,nomor:no,jumlah:d.personel.length,lama:3,totalBiaya:0,status:'MENUNGGU MANAGER',peringatan:[]}},
  estimasiSPL:(t,d)=>d.baris.map(b=>{if(!(b.id&&b.mulai&&b.selesai&&d.tanggal))return null;const h=hitungLembur_({tanggal:d.tanggal,mulai:b.mulai,selesai:b.selesai,gaji:4642000},dataP,Object.assign({},{'2026-12-25':1},d.liburNasional?{[d.tanggal]:1}:{}));return h.error.length?null:h.kompensasi}),
- riwayatSPL:()=>RW_SPL, riwayatSPD:()=>RW_SPD
+ riwayatSPL:()=>RW_SPL, riwayatSPD:()=>RW_SPD,
+ spdOpen:()=>OPENS,
+ simpanPtjSPD:(t,d)=>{window.PTJ=d;OPENS=OPENS.filter(o=>o.nomor!==d.nomor);return {ok:true,nomor:d.nomor,totalRencana:450000,totalRealisasi:730000,selisih:280000,pdf:'#'}}
 };
 </script><meta name="viewport" content="width=device-width, initial-scale=1"><title>Demo Form SPL & SPD</title>
 <base target="_top">
@@ -47,7 +50,9 @@ window.SERVER={
   .nav{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}
   .nav button{border:1px solid var(--line);background:#fff;padding:9px 14px;border-radius:8px;cursor:pointer;font-weight:bold;color:var(--mute);font-size:13px}
   .nav button.on{background:var(--char);color:#fff;border-color:var(--char)}
-  .pilih{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .pilih{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+  .op-item{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px;display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+  .tot3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px} .tot3 div{background:#F7F7F8;border-radius:8px;padding:10px} .tot3 b{display:block;font-size:16px;margin-top:4px}
   .pilih button{text-align:left;background:#fff;border:1px solid var(--line);border-left:6px solid var(--brand);border-radius:12px;padding:20px;cursor:pointer;font:inherit;color:var(--ink);transition:.15s}
   .pilih button:hover{box-shadow:0 4px 14px rgba(0,0,0,.08);transform:translateY(-1px)}
   .pilih .ic{font-size:30px}
@@ -180,13 +185,18 @@ window.SERVER={
       <div class="pilih">
         <button onclick="buka('spl')">
           <div class="ic">⏱️</div>
-          <div class="t">Surat Perintah Lembur (SPL)</div>
+          <div class="t">Surat Perintah Lembur</div>
           <div class="d">Perintah kerja lembur untuk satu tanggal — bisa banyak karyawan sekaligus. Jam efektif & istirahat dihitung otomatis.</div>
         </button>
         <button onclick="buka('spd')">
           <div class="ic">🚗</div>
-          <div class="t">Surat Perintah Dinas (SPD)</div>
+          <div class="t">Surat Perintah Dinas</div>
           <div class="d">Penugasan perjalanan dinas luar — maks. <span id="maksPers">5</span> personel per surat, uang saku & biaya dihitung otomatis.</div>
+        </button>
+        <button onclick="buka('ptj')">
+          <div class="ic">📋</div>
+          <div class="t">Pertanggungjawaban Dinas</div>
+          <div class="d">Selesaikan laporan perjalanan dinas yang masih <b>OPEN</b> — <b id="nOpen">…</b></div>
         </button>
       </div>
       <div class="card" style="margin-top:14px">
@@ -197,7 +207,7 @@ window.SERVER={
 
     <!-- ---------- SPL ---------- -->
     <section id="pSpl" class="hide">
-      <h2 class="judul">SURAT PERINTAH LEMBUR (SPL)<small>Nomor surat dibuat otomatis saat dikirim</small></h2>
+      <h2 class="judul">SURAT PERINTAH LEMBUR<small>Nomor surat dibuat otomatis saat dikirim</small></h2>
       <div class="card">
         <div class="row" style="margin:0">
           <div style="max-width:200px"><label>Tanggal Lembur *</label><input id="lTgl" type="date" onchange="hitungSPL()"></div>
@@ -224,12 +234,12 @@ window.SERVER={
         <div class="sum"><b id="lOrang">0</b> karyawan · <b id="lJam">0</b> jam</div>
       </div>
       <div id="lErr"></div>
-      <div class="bar" style="justify-content:flex-end"><button class="btn" id="lKirim" onclick="splKonfirmasi()">Kirim SPL</button></div>
+      <div class="bar" style="justify-content:flex-end"><button class="btn" id="lKirim" onclick="splKonfirmasi()">Kirim Surat</button></div>
     </section>
 
     <!-- ---------- SPD ---------- -->
     <section id="pSpd" class="hide">
-      <h2 class="judul">SURAT PERINTAH DINAS (SPD)<small>Nomor surat dibuat otomatis saat dikirim</small></h2>
+      <h2 class="judul">SURAT PERINTAH DINAS<small>Nomor surat dibuat otomatis saat dikirim</small></h2>
       <div class="card">
         <div class="sek">A. Referensi Surat</div>
         <div class="row">
@@ -263,7 +273,7 @@ window.SERVER={
         </div>
       </div>
       <div class="card" style="padding:0">
-        <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan <span class="sub">(maks. <span id="dMaks">5</span> orang — bila lebih, buat SPD baru)</span></div>
+        <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan <span class="sub">(maks. <span id="dMaks">5</span> orang — bila lebih, buat surat baru)</span></div>
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Lama (hari)</th><th>Uang Saku</th><th style="min-width:180px">Keterangan</th><th></th></tr></thead>
           <tbody id="pRows"></tbody>
@@ -285,7 +295,57 @@ window.SERVER={
         <div class="total besar"><span>TOTAL BIAYA PERJALANAN DINAS</span><span id="tAll">Rp 0</span></div>
       </div>
       <div id="dErr"></div>
-      <div class="bar" style="justify-content:flex-end"><button class="btn" id="dKirim" onclick="spdKonfirmasi()">Kirim SPD</button></div>
+      <div class="bar" style="justify-content:flex-end"><button class="btn" id="dKirim" onclick="spdKonfirmasi()">Kirim Surat</button></div>
+    </section>
+
+    <!-- ---------- PERTANGGUNGJAWABAN DINAS ---------- -->
+    <section id="pPtj" class="hide">
+      <h2 class="judul">PERTANGGUNGJAWABAN DINAS<small>Surat Perintah Dinas berstatus OPEN — pilih surat untuk diselesaikan laporannya</small></h2>
+      <div class="card" id="ptjList"></div>
+      <div id="ptjForm" class="hide">
+        <div class="card" id="ptjInfo"></div>
+        <div class="card">
+          <div class="sek">B. Realisasi Perjalanan</div>
+          <div class="row" style="margin:0">
+            <div style="max-width:200px"><label>Tgl. Berangkat Aktual *</label><input id="tBrk" type="date" onchange="hitungPtj()"></div>
+            <div style="max-width:200px"><label>Tgl. Kembali Aktual *</label><input id="tKmb" type="date" onchange="hitungPtj()"></div>
+            <div style="max-width:160px"><label>Lama Aktual</label><div class="chip" id="tLama">–</div></div>
+          </div>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="sek" style="padding:14px 16px 0">C. Personel &amp; Uang Saku <span class="sub">(isi 0 bila personel batal berangkat)</span></div>
+          <table class="mob">
+            <thead><tr><th>No</th><th style="min-width:200px">Personel</th><th>Lama Rencana</th><th>Lama Aktual (hari)</th><th>Uang Saku Realisasi</th><th style="min-width:160px">Keterangan</th></tr></thead>
+            <tbody id="tPer"></tbody>
+          </table>
+        </div>
+        <div class="card" style="padding:0">
+          <div class="sek" style="padding:14px 16px 0">D. Biaya Lainnya (Realisasi)</div>
+          <table class="mob">
+            <thead><tr><th>No</th><th style="min-width:170px">Jenis Biaya</th><th style="min-width:200px">Uraian</th><th style="min-width:130px">Jumlah (Rp)</th><th>Bukti</th><th></th></tr></thead>
+            <tbody id="tBia"></tbody>
+          </table>
+          <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="ptjTambahBiaya()">+ Tambah biaya</button></div>
+        </div>
+        <div class="card">
+          <div class="sek">E. Laporan Kegiatan</div>
+          <label>Ringkasan hasil kegiatan *</label>
+          <textarea id="tRingkas" rows="4" oninput="hitungPtj()" placeholder="Contoh: Survey lokasi proyek selesai, hasil pengukuran terlampir…"></textarea>
+          <label class="cek" style="margin-top:10px"><input type="checkbox" id="tSah"> Bukti pengesahan (tanda tangan &amp; stempel) di tempat tujuan sudah diterima</label>
+        </div>
+        <div class="card">
+          <div class="tot3">
+            <div><span class="sub">Total rencana</span><b id="tRen">-</b></div>
+            <div><span class="sub">Total realisasi</span><b id="tRea">-</b></div>
+            <div><span class="sub" id="tSelL">Selisih</span><b id="tSel">-</b></div>
+          </div>
+        </div>
+        <div id="tErr"></div>
+        <div class="bar" style="justify-content:flex-end">
+          <button class="btn sec" onclick="tutupPtj()">Batal</button>
+          <button class="btn" id="tSimpan" onclick="ptjKonfirmasi()">Simpan Pertanggungjawaban</button>
+        </div>
+      </div>
     </section>
 
     <!-- ---------- RIWAYAT ---------- -->
@@ -294,8 +354,8 @@ window.SERVER={
         <div class="bar" style="margin-top:0">
           <div class="filter" id="fRw">
             <button class="on" data-f="" onclick="filterRw('')">Semua</button>
-            <button data-f="SPL" onclick="filterRw('SPL')">SPL</button>
-            <button data-f="SPD" onclick="filterRw('SPD')">SPD</button>
+            <button data-f="SPL" onclick="filterRw('SPL')">Lembur</button>
+            <button data-f="SPD" onclick="filterRw('SPD')">Dinas</button>
           </div>
           <button class="btn sec kecil" onclick="muatRiwayat()">↻ Muat ulang</button>
         </div>
@@ -413,6 +473,8 @@ function hitungSPD_(x, P) {
 }
 
 /* ===== utilitas ===== */
+const LABEL_JENIS = { SPL: 'Lembur', SPD: 'Dinas' };
+const NAMA_JENIS = { SPL: 'Surat Perintah Lembur', SPD: 'Surat Perintah Dinas' };
 let TOKEN = null, D = null, uid = 0, RW = [], FRW = '';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -570,9 +632,11 @@ document.addEventListener('keydown', e => {
 
 /* ===== navigasi ===== */
 function buka(p) {
-  ['home', 'spl', 'spd', 'riwayat'].forEach(x => $('p' + x[0].toUpperCase() + x.slice(1)).classList.toggle('hide', x !== p));
+  ['home', 'spl', 'spd', 'ptj', 'riwayat'].forEach(x => $('p' + x[0].toUpperCase() + x.slice(1)).classList.toggle('hide', x !== p));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p === 'riwayat' || p === 'home') muatRiwayat();
+  if (p === 'ptj' || p === 'home') muatOpen();
+  if (p === 'ptj') tutupPtj();
   window.scrollTo(0, 0);
 }
 
@@ -583,7 +647,7 @@ let LROWS = [], SPL_OK = false;
 function splBaru() { $('lTgl').value = ''; $('lLibur').checked = false; LROWS = []; $('lRows').innerHTML = ''; splTambah(true); pesan('lErr'); hitungSPL(); }
 function splTambah(tanpaFokus) {
   const maks = Number(D.P.MAKS_KARYAWAN_PER_SPL) || 30;
-  if (LROWS.length >= maks) { alert('Maksimal ' + maks + ' karyawan per SPL.'); return; }
+  if (LROWS.length >= maks) { alert('Maksimal ' + maks + ' karyawan per surat.'); return; }
   const prev = LROWS[LROWS.length - 1], id = ++uid;
   const tr = document.createElement('tr'); tr.id = 'l' + id;
   tr.innerHTML =
@@ -663,14 +727,14 @@ function splKonfirmasi() {
   hitungSPL(); if (!SPL_OK) return;
   const d = splData(), t = keTanggal_(d.tanggal);
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Lembur</h3><p><b>' + NAMA_HARI[hariKe_(t) - 1] + ', ' + tglPanjang(d.tanggal) + '</b><br>' +
-    'Total karyawan yang akan lembur <b>' + d.baris.length + ' karyawan</b></p><p class="sub">Setelah dikirim, SPL masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+    'Total karyawan yang akan lembur <b>' + d.baris.length + ' karyawan</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="splKirim()">Ya, kirim</button></div>');
 }
 async function splKirim() {
   sibuk($('bYa'), true, 'Menyimpan…'); pesan('lErr');
   try {
     const r = await run('simpanSPL', TOKEN, splData());
-    if (!r.ok) { tutupModal(); pesan('lErr', 'err', '<b>SPL belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
+    if (!r.ok) { tutupModal(); pesan('lErr', 'err', '<b>Surat belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
     splBaru();
     sukses('SPL', r.nomor, r.jumlah + ' karyawan · ' + fmtJam(r.totalJam) + ' jam', r.status, []);
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('lErr', 'err', esc(errText(e))); }
@@ -691,7 +755,7 @@ function spdBaru() {
 }
 function spdTambahPersonel() {
   const maks = Number(D.P.MAKS_PERSONEL_SPD) || 5;
-  if (PROWS.length >= maks) { alert('Maksimal ' + maks + ' personel per SPD — buat SPD baru untuk personel berikutnya.'); return; }
+  if (PROWS.length >= maks) { alert('Maksimal ' + maks + ' personel per surat — buat surat baru untuk personel berikutnya.'); return; }
   const id = ++uid, tr = document.createElement('tr'); tr.id = 'p' + id;
   tr.innerHTML =
     '<td class="n"></td>' +
@@ -795,26 +859,139 @@ function spdKonfirmasi() {
   const umum = hitungSPD();
   if (!SPD_OK) { if (umum.length) pesan('dErr', 'err', umum.map(esc).join('<br>')); return; }
   const d = spdData();
-  modal('<h3 style="margin-top:0">Kirim SPD?</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
-    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b></p><p class="sub">Setelah dikirim, SPD masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+  modal('<h3 style="margin-top:0">Kirim Surat Perintah Dinas</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
+    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="spdKirim()">Ya, kirim</button></div>');
 }
 async function spdKirim() {
   sibuk($('bYa'), true, 'Menyimpan…');
   try {
     const r = await run('simpanSPD', TOKEN, spdData());
-    if (!r.ok) { tutupModal(); pesan('dErr', 'err', '<b>SPD belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
+    if (!r.ok) { tutupModal(); pesan('dErr', 'err', '<b>Surat belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
     spdBaru();
     sukses('SPD', r.nomor, r.jumlah + ' personel · ' + r.lama + ' hari · ' + rp(r.totalBiaya), r.status, r.peringatan || []);
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('dErr', 'err', esc(errText(e))); }
 }
 
 function sukses(jenis, nomor, ringkas, status, warn) {
-  modal('<h3 style="margin-top:0;color:var(--ok)">✅ ' + jenis + ' tersimpan</h3>' +
+  modal('<h3 style="margin-top:0;color:var(--ok)">✅ ' + NAMA_JENIS[jenis] + ' tersimpan</h3>' +
     '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) sudah dikirim ke tiap ' + (jenis === 'SPL' ? 'karyawan' : 'personel') + '.</p>' +
     (warn.length ? '<div class="msg warn">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</div>' : '') +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal();buka(\'riwayat\')">Lihat riwayat</button>' +
     '<button class="btn" onclick="tutupModal();buka(\'home\')">Selesai</button></div>');
+}
+
+/* =====================================================================
+   PERTANGGUNGJAWABAN DINAS
+   ===================================================================== */
+let OPEN = [], PT = null, TBROWS = [];
+async function muatOpen() {
+  if ($('pPtj').classList.contains('hide') === false) $('ptjList').innerHTML = '<div class="sub">Memuat…</div>';
+  try {
+    OPEN = await run('spdOpen', TOKEN);
+    $('nOpen').textContent = OPEN.length ? OPEN.length + ' surat OPEN' : 'tidak ada yang OPEN';
+    $('ptjList').innerHTML = OPEN.length ? OPEN.map(x => {
+      const ok = x.personel.filter(p => p.status === 'DISETUJUI').length;
+      return '<div class="op-item"><div><b>' + esc(x.nomor) + '</b><div class="sub">' + esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) +
+        ' · ' + ok + ' dari ' + x.personel.length + ' personel disetujui</div><div class="sub"><i>' + esc(x.maksud) + '</i></div></div>' +
+        (x.selesaiApproval ? '<button class="btn kecil" onclick="pilihPtj(\'' + esc(x.nomor) + '\')">Selesaikan</button>'
+          : '<span class="st MENUNGGU" title="Konfirmasi / persetujuan personel belum selesai">PROSES PERSETUJUAN</span>') + '</div>';
+    }).join('') : '<div class="sub">Tidak ada Surat Perintah Dinas yang berstatus OPEN. 👍</div>';
+  } catch (e) { if (!sesiHabis(e)) $('ptjList').innerHTML = '<div class="msg err">' + esc(errText(e)) + '</div>'; }
+}
+function tutupPtj() { PT = null; $('ptjForm').classList.add('hide'); $('ptjList').classList.remove('hide'); pesan('tErr'); }
+function pilihPtj(nomor) {
+  PT = OPEN.find(x => x.nomor === nomor); if (!PT) return;
+  $('ptjList').classList.add('hide'); $('ptjForm').classList.remove('hide');
+  $('ptjInfo').innerHTML = '<div class="sek">A. Surat Perintah Dinas</div><b style="font-size:16px">' + esc(PT.nomor) + '</b>' +
+    '<div class="sub" style="font-size:13px;margin-top:4px">' + esc(PT.maksud) + '<br>Tujuan: <b>' + esc(PT.tempat) + '</b> · Rencana ' + tglPanjang(PT.berangkat) + ' s/d ' + tglPanjang(PT.kembali) +
+    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '</div>';
+  $('tBrk').value = PT.berangkat; $('tKmb').value = PT.kembali; $('tRingkas').value = ''; $('tSah').checked = false;
+  const per = PT.personel.filter(p => p.status === 'DISETUJUI');
+  $('tPer').innerHTML = per.length ? per.map((p, i) => '<tr data-id="' + esc(p.id) + '"><td class="n">' + (i + 1) + '</td>' +
+    '<td data-l="Personel"><b>' + esc(p.nama) + '</b><div class="sub">' + esc(p.id) + ' · ' + esc(p.jabatan || '') + '</div><div class="rowerr"></div></td>' +
+    '<td class="auto half" data-l="Lama Rencana">' + p.lama + ' hari</td>' +
+    '<td class="half" data-l="Lama Aktual (hari)"><input class="lm" type="number" min="0" step="1" value="' + p.lama + '" oninput="hitungPtj()"></td>' +
+    '<td class="auto uang saku half" data-l="Uang Saku Realisasi">-</td>' +
+    '<td data-l="Keterangan"><input class="ket" placeholder="opsional"></td></tr>').join('')
+    : '<tr><td colspan="6" class="sub" style="padding:12px">Tidak ada personel yang disetujui — surat tetap bisa ditutup dengan laporan.</td></tr>';
+  TBROWS = []; $('tBia').innerHTML = '';
+  PT.biaya.forEach(b => ptjTambahBiaya(b));
+  pesan('tErr'); hitungPtj(); window.scrollTo(0, 0);
+}
+function ptjTambahBiaya(b) {
+  if (TBROWS.length >= 15) { alert('Maksimal 15 baris biaya.'); return; }
+  b = b || {};
+  const id = ++uid, tr = document.createElement('tr'); tr.id = 't' + id;
+  tr.innerHTML = '<td class="n"></td>' +
+    '<td data-l="Jenis Biaya"><select class="j" onchange="hitungPtj()">' + opsi(D.pilihan.jenisBiaya, b.jenis || '', '— pilih —') + '</select><div class="rowerr"></div></td>' +
+    '<td data-l="Uraian"><input class="ur" value="' + esc(b.uraian || '') + '"></td>' +
+    '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="number" min="0" step="1000" value="' + (b.jumlah != null ? b.jumlah : '') + '" oninput="hitungPtj()"><div class="sub fmt"></div></td>' +
+    '<td class="half" data-l="Bukti"><select class="bk">' + opsi(D.pilihan.bukti, b.bukti || '') + '</select></td>' +
+    '<td class="aksi"><button class="del" title="Hapus" onclick="ptjHapusBiaya(' + id + ')">✕</button></td>';
+  $('tBia').appendChild(tr); TBROWS.push({ id: id, el: tr }); hitungPtj();
+}
+function ptjHapusBiaya(id) { TBROWS = TBROWS.filter(r => r.id !== id); $('t' + id).remove(); hitungPtj(); }
+let PTJ_OK = false;
+function hitungPtj() {
+  if (!PT) return;
+  const b = $('tBrk').value, k = $('tKmb').value, e = [];
+  const lama = (b && k) ? Math.max(Math.round((keTanggal_(k) - keTanggal_(b)) / 86400000) + 1, 0) : 0;
+  $('tLama').textContent = lama ? lama + ' hari' : '–';
+  if (!b || !k) e.push('Isi tanggal berangkat & kembali aktual.'); else if (k < b) e.push('Tanggal kembali lebih awal dari tanggal berangkat.');
+  let saku = 0;
+  document.querySelectorAll('#tPer tr[data-id]').forEach(tr => {
+    const v = tr.querySelector('.lm').value, n = Number(v), er = [];
+    if (v === '' || !(n >= 0 && n === Math.floor(n))) er.push('Isi lama aktual.');
+    else if (lama && n > lama) er.push('Melebihi lama dinas (' + lama + ' hari).');
+    tr.querySelector('.saku').textContent = (n >= 0 && v !== '') ? rp(n * D.P.UANG_SAKU_HARI) : '-';
+    if (n >= 0) saku += (n || 0) * D.P.UANG_SAKU_HARI;
+    tr.querySelector('.rowerr').textContent = er.join(' ');
+    if (er.length) e.push('Periksa lama aktual personel.');
+  });
+  let lain = 0;
+  TBROWS.forEach((r, i) => {
+    const el = r.el, j = el.querySelector('.j').value, jm = el.querySelector('.jm').value, er = [];
+    el.querySelector('.n').textContent = i + 1;
+    el.querySelector('.fmt').textContent = jm ? rp(jm) : '';
+    if (jm && !j) er.push('Pilih jenis biaya.');
+    if (j && jm === '') er.push('Isi jumlah.');
+    el.querySelector('.rowerr').textContent = er.join(' ');
+    if (er.length) e.push('Periksa baris biaya.');
+    lain += Number(jm) || 0;
+  });
+  if (!$('tRingkas').value.trim()) e.push('Isi ringkasan hasil kegiatan.');
+  const ren = PT.uangSakuRencana + PT.biayaRencana, rea = saku + lain, sel = rea - ren;
+  $('tRen').textContent = rp(ren); $('tRea').textContent = rp(rea);
+  $('tSelL').textContent = sel > 0 ? 'Kurang bayar' : sel < 0 ? 'Lebih bayar' : 'Selisih';
+  $('tSel').textContent = rp(Math.abs(sel));
+  PTJ_OK = !e.length; $('tSimpan').disabled = !PTJ_OK; $('tSimpan').title = [...new Set(e)].join('\n');
+  return [...new Set(e)];
+}
+function ptjData() {
+  return {
+    nomor: PT.nomor, berangkat: $('tBrk').value, kembali: $('tKmb').value, ringkasan: $('tRingkas').value, pengesahan: $('tSah').checked,
+    personel: [...document.querySelectorAll('#tPer tr[data-id]')].map(tr => ({ id: tr.dataset.id, lama: Number(tr.querySelector('.lm').value), keterangan: tr.querySelector('.ket').value })),
+    biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(r.el.querySelector('.jm').value) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
+  };
+}
+function ptjKonfirmasi() {
+  const e = hitungPtj();
+  if (!PTJ_OK) { pesan('tErr', 'err', e.map(esc).join('<br>')); return; }
+  modal('<h3 style="margin-top:0">Simpan Pertanggungjawaban</h3><p><b>' + esc(PT.nomor) + '</b><br>' + esc(PT.tempat) + '<br>Total realisasi <b>' + $('tRea').textContent + '</b></p>' +
+    '<p class="sub">Setelah disimpan, status surat menjadi SELESAI dan laporan PDF dikirim ke admin.</p>' +
+    '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="ptjKirim()">Ya, simpan</button></div>');
+}
+async function ptjKirim() {
+  sibuk($('bYa'), true, 'Menyimpan…');
+  try {
+    const r = await run('simpanPtjSPD', TOKEN, ptjData());
+    if (!r.ok) { tutupModal(); pesan('tErr', 'err', '<b>Belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Pertanggungjawaban tersimpan</h3><p><b>' + esc(r.nomor) + '</b> — status <span class="st SELESAI">SELESAI</span></p>' +
+      '<p>Rencana ' + rp(r.totalRencana) + ' · Realisasi <b>' + rp(r.totalRealisasi) + '</b><br>' + (r.selisih > 0 ? 'Kurang bayar ' : r.selisih < 0 ? 'Lebih bayar ' : 'Selisih ') + rp(Math.abs(r.selisih)) + '</p>' +
+      '<p><a href="' + esc(r.pdf) + '" target="_blank">📄 Buka PDF laporan</a></p>' +
+      '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();tutupPtj();muatOpen()">Selesai</button></div>');
+  } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('tErr', 'err', esc(errText(e))); }
 }
 
 /* =====================================================================
@@ -836,15 +1013,16 @@ function kartu(x) {
     info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang · ' + fmtJam(x.totalJam) + ' jam';
     det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
       (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
-      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF SPL</a>' : '');
+      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF</a>' : '');
   } else {
     info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · ' + rp(x.totalBiaya);
     det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '') +
       (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
-      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF SPD</a>' : '');
+      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF surat</a>' : '') +
+      (x.pdfLaporan ? '<br><a href="' + esc(x.pdfLaporan) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka laporan pertanggungjawaban</a>' : '');
   }
-  return '<div class="rw" onclick="this.classList.toggle(\'buka\')"><div class="bar" style="margin:0"><div><span class="jn ' + x.jenis + '">' + x.jenis + '</span><b>' + esc(x.nomor) +
-    '</b><div class="sub">' + info + '</div></div><span class="st ' + esc(kelas) + '">' + esc(x.status) + '</span></div><div class="det">' + det + '</div></div>';
+  return '<div class="rw" onclick="this.classList.toggle(\'buka\')"><div class="bar" style="margin:0"><div><span class="jn ' + x.jenis + '">' + LABEL_JENIS[x.jenis] + '</span><b>' + esc(x.nomor) +
+    '</b><div class="sub">' + info + '</div></div><div>' + (x.statusDinas ? '<span class="st ' + (x.statusDinas === 'OPEN' ? 'MENUNGGU' : 'SELESAI') + '" title="Status pertanggungjawaban">' + x.statusDinas + '</span> ' : '') + '<span class="st ' + esc(kelas) + '">' + esc(x.status) + '</span></div></div><div class="det">' + det + '</div></div>';
 }
 function tampilRiwayat() {
   const L = RW.filter(x => !FRW || x.jenis === FRW);
