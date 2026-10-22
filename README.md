@@ -10,8 +10,11 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 |---|---|
 | `Inti.gs` | Fungsi inti: baca master & parameter, rumus lembur, rumus SPD, nomor surat, log |
 | `Menu.gs` | Menu `⚙️ SPL / SPD` di spreadsheet, setup awal, cek data karyawan, tes hitung |
-| `Spl.gs` | Web App form SPL: login OTP email, simpan SPL, riwayat |
-| `FormSPL.html` | Tampilan form SPL (dipakai oleh `Spl.gs`) |
+| `Logo.gs` | Logo perusahaan (base64) untuk header form & kop surat PDF |
+| `Web.gs` | Web App: tampilan, login OTP email, data form, alur approval |
+| `Spl.gs` | Simpan & riwayat Surat Perintah Lembur |
+| `Spd.gs` | Simpan & riwayat Surat Perintah Dinas |
+| `Form.html` | Tampilan form (Beranda · SPL · SPD · Riwayat) |
 
 ## Pasang
 1. Database Google Sheet (sheet: Karyawan, Parameter, Pilihan, Libur, Data SPL, Data SPD, Personel SPD, Biaya SPD, Log).
@@ -22,8 +25,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 
 ## Tahapan
 - [x] Tahap 1 — Database & script inti
-- [x] Tahap 2–3 — Form SPL, nomor otomatis, simpan
+- [x] Tahap 2–3 — Form SPL & SPD (logo perusahaan), nomor otomatis, simpan
 - [ ] Tahap 4 — Email notifikasi & approval Manager / HRD
-- [ ] Tahap 5 — Cetak PDF surat
+- [ ] Tahap 5 — Cetak PDF surat (kop surat dengan logo)
 - [ ] Tahap 6 — Panel admin & rekap
-- [ ] Form SPD

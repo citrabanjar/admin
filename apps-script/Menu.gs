@@ -11,7 +11,7 @@ function onOpen() {
     .addItem('2. Cek data karyawan', 'cekDataKaryawan')
     .addItem('3. Tes hitung lembur & SPD', 'tesHitung')
     .addSeparator()
-    .addItem('🔗 Link form SPL', 'bukaFormSPL')
+    .addItem('🔗 Link form SPL & SPD', 'bukaForm')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addToUi();
 }
