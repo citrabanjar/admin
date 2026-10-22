@@ -529,22 +529,39 @@ function hitungSPL() {
   jadwalEstimasi();
 }
 
-/* ===== estimasi kompensasi (dihitung server, ditunda 0,4 dtk setelah perubahan) ===== */
-let tEst = null, nEst = 0;
+/* ===== estimasi kompensasi =====
+   Dihitung di server, tapi hasil disimpan per kombinasi (tanggal|libur|karyawan|mulai|selesai).
+   Server hanya dipanggil untuk baris yang kombinasinya belum pernah dihitung. */
+const ESTC = {};
+let tEst = null;
+function kunciEst(d, r) {
+  const id = r.querySelector('.k').value, m = r.querySelector('.m').value, s = r.querySelector('.s').value;
+  return d.tanggal && id && m && s ? [d.tanggal, d.liburNasional ? 1 : 0, id, m, s].join('|') : '';
+}
+function tampilEst() {
+  const d = splData(); let tot = 0, ada = false;
+  LROWS.forEach(r => {
+    const k = kunciEst(d, r.el), c = r.el.querySelector('.komp'), v = k ? ESTC[k] : undefined;
+    c.textContent = !k ? '-' : v === undefined ? '…' : v === null ? '-' : rp(v);
+    if (k && v) { tot += v; ada = true; }
+  });
+  $('lKompTot').textContent = ada ? rp(tot) : '-';
+}
 function jadwalEstimasi() {
+  tampilEst();
   clearTimeout(tEst);
   tEst = setTimeout(async () => {
-    const d = splData(), ke = ++nEst, sel = LROWS.map(r => r.el.querySelector('.komp'));
-    const baris = LROWS.map(r => ({ id: r.el.querySelector('.k').value, mulai: r.el.querySelector('.m').value, selesai: r.el.querySelector('.s').value }));
-    if (!d.tanggal || !baris.some(b => b.id && b.mulai && b.selesai)) { sel.forEach(c => c.textContent = '-'); $('lKompTot').textContent = '-'; return; }
-    sel.forEach((c, i) => { if (baris[i].id && baris[i].mulai && baris[i].selesai) c.textContent = '…'; });
+    const d = splData(), perlu = {}, baris = [];
+    LROWS.forEach(r => {
+      const k = kunciEst(d, r.el);
+      if (k && !(k in ESTC) && !perlu[k]) { perlu[k] = 1; const p = k.split('|'); baris.push({ id: p[2], mulai: p[3], selesai: p[4], _k: k }); }
+    });
+    if (!baris.length) return;                 // semua sudah ada di simpanan → tidak perlu ke server
     try {
       const h = await run('estimasiSPL', TOKEN, { tanggal: d.tanggal, liburNasional: d.liburNasional, baris: baris });
-      if (ke !== nEst) return;   // ada perubahan lebih baru
-      let tot = 0;
-      h.forEach((v, i) => { if (sel[i]) sel[i].textContent = v == null ? '-' : rp(v); tot += v || 0; });
-      $('lKompTot').textContent = tot ? rp(tot) : '-';
-    } catch (e) { if (!sesiHabis(e)) sel.forEach(c => c.textContent = '-'); }
+      baris.forEach((b, i) => ESTC[b._k] = h[i]);
+      tampilEst();
+    } catch (e) { sesiHabis(e); }
   }, 400);
 }
 function splData() {
