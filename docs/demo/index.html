@@ -448,6 +448,7 @@ function acCari(inp) {
   const box = inp.parentNode, list = box.querySelector('.acl'), hid = box.querySelector('.k');
   if (hid.value && inp.value !== inp.dataset.label) { hid.value = ''; inp.classList.remove('ok'); window[inp.dataset.cb](); }
   const q = acNorm(inp.value).trim(), kata = q.split(/\s+/).filter(Boolean);
+  if (!q) { list.classList.add('hide'); return; }   // daftar saran hanya muncul setelah mengetik
   // karyawan yang sudah dipilih di baris lain tidak ditampilkan lagi
   const tabel = inp.closest('tbody'), dipakai = {};
   tabel.querySelectorAll('.k').forEach(h => { if (h !== hid && h.value) dipakai[h.value] = 1; });
@@ -579,8 +580,8 @@ function buka(p) {
    SPL
    ===================================================================== */
 let LROWS = [], SPL_OK = false;
-function splBaru() { $('lTgl').value = ''; $('lLibur').checked = false; LROWS = []; $('lRows').innerHTML = ''; splTambah(); pesan('lErr'); hitungSPL(); }
-function splTambah() {
+function splBaru() { $('lTgl').value = ''; $('lLibur').checked = false; LROWS = []; $('lRows').innerHTML = ''; splTambah(true); pesan('lErr'); hitungSPL(); }
+function splTambah(tanpaFokus) {
   const maks = Number(D.P.MAKS_KARYAWAN_PER_SPL) || 30;
   if (LROWS.length >= maks) { alert('Maksimal ' + maks + ' karyawan per SPL.'); return; }
   const prev = LROWS[LROWS.length - 1], id = ++uid;
@@ -597,7 +598,7 @@ function splTambah() {
   aturJamBaris(tr);
   if (prev) { tr.querySelector('.m').value = prev.el.querySelector('.m').value; aturJamBaris(tr); tr.querySelector('.s').value = prev.el.querySelector('.s').value; }
   hitungSPL();
-  tr.querySelector('.kq').focus();
+  if (!tanpaFokus) tr.querySelector('.kq').focus();
 }
 function splHapus(id) {
   if (LROWS.length === 1) { const r = LROWS[0].el; acKosongkan(r); r.querySelector('.u').value = ''; hitungSPL(); return; }
