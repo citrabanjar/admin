@@ -14,6 +14,7 @@ const SH_PTJ = { INDUK: 'Ptj SPD', PERSONEL: 'Ptj Personel SPD', BIAYA: 'Ptj Bia
 const KOLOM_PTJ = {
   'Ptj SPD': ['Nomor SPD', 'Tgl Berangkat Aktual', 'Tgl Kembali Aktual', 'Lama Aktual (hari)', 'Ringkasan Kegiatan', 'Pengesahan Diterima',
     'Uang Saku Rencana', 'Uang Saku Realisasi', 'Biaya Lain Rencana', 'Biaya Lain Realisasi', 'Total Rencana', 'Total Realisasi', 'Selisih',
+    'Uang Kas Perjalanan', 'Uang Kas Dikembalikan',
     'Dilaporkan Oleh', 'Dilaporkan Pada', 'Link PDF'],
   'Ptj Personel SPD': ['Nomor SPD', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'],
   'Ptj Biaya SPD': ['Nomor SPD', 'No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti']
@@ -26,7 +27,7 @@ function sheetPtj_(nama) {
     sh = ss.insertSheet(nama);
     sh.getRange(1, 1, 1, KOLOM_PTJ[nama].length).setValues([KOLOM_PTJ[nama]]).setFontWeight('bold').setBackground('#3A3A3A').setFontColor('#FFFFFF');
     sh.setFrozenRows(1);
-  }
+  } else pastikanKolom_(nama, KOLOM_PTJ[nama]);
   return sh;
 }
 
@@ -51,6 +52,7 @@ function dataSpd_(nomor) {
     transportasi: I['Transportasi'], sumberBiaya: I['Sumber Biaya'], statusDinas: I['Status Dinas'] || 'Aktif',
     statusApproval: I['Status'] || '', dibuatOleh: I['Dibuat Oleh'], emailPembuat: I['Email Pembuat'],
     personel: per, biaya: biaya, selesaiApproval: selesaiApproval,
+    uangKas: Number(I['Uang Kas Perjalanan']) || 0,
     uangSakuRencana: disetujui.reduce((s, p) => s + p.uangSaku, 0), biayaRencana: biaya.reduce((s, b) => s + b.jumlah, 0)
   };
 }
@@ -108,36 +110,49 @@ function simpanPtjSPD(token, d) {
     const sakuReal = per.reduce((s, p) => s + p.uangSaku, 0);
     const lainReal = biaya.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
     const totRencana = S.uangSakuRencana + S.biayaRencana, totReal = sakuReal + lainReal;
+    const kasKembali = S.uangKas - lainReal;   // + = dikembalikan ke perusahaan, - = kekurangan (dibayar perusahaan)
     const now = new Date(), tp = s => Utilities.parseDate(s + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
 
     const ptj = { berangkat: d.berangkat, kembali: d.kembali, lamaAktual: lamaAktual, ringkasan: String(d.ringkasan).trim(),
       pengesahan: !!d.pengesahan, personel: per, biaya: biaya, sakuReal: sakuReal, lainReal: lainReal, totRencana: totRencana, totReal: totReal,
+      uangKas: S.uangKas, kasKembali: kasKembali,
       oleh: u.nama, pada: now };
     const pdf = buatPdfPtj_(S, ptj);
     const file = folderPdf_(JENIS.SPD.folder).createFile(pdf);
 
-    sheetPtj_(SH_PTJ.INDUK).appendRow([S.nomor, tp(d.berangkat), tp(d.kembali), lamaAktual, ptj.ringkasan, ptj.pengesahan ? 'Ya' : 'Tidak',
-      S.uangSakuRencana, sakuReal, S.biayaRencana, lainReal, totRencana, totReal, totReal - totRencana, u.nama, now, file.getUrl()]);
-    const shP = sheetPtj_(SH_PTJ.PERSONEL);
-    per.forEach(p => shP.appendRow([S.nomor, p.ref.id, p.ref.nama, p.ref.lama, p.lama, p.ref.uangSaku, p.uangSaku, p.keterangan]));
-    const shB = sheetPtj_(SH_PTJ.BIAYA);
-    biaya.forEach((b, i) => shB.appendRow([S.nomor, i + 1, String(b.jenis).trim(), String(b.uraian || '').trim(), Number(b.jumlah) || 0, String(b.bukti || '')]));
+    Object.keys(KOLOM_PTJ).forEach(sheetPtj_);
+    tulisBaris_(SH_PTJ.INDUK, [{ 'Nomor SPD': S.nomor, 'Tgl Berangkat Aktual': tp(d.berangkat), 'Tgl Kembali Aktual': tp(d.kembali), 'Lama Aktual (hari)': lamaAktual,
+      'Ringkasan Kegiatan': ptj.ringkasan, 'Pengesahan Diterima': ptj.pengesahan ? 'Ya' : 'Tidak',
+      'Uang Saku Rencana': S.uangSakuRencana, 'Uang Saku Realisasi': sakuReal, 'Biaya Lain Rencana': S.biayaRencana, 'Biaya Lain Realisasi': lainReal,
+      'Total Rencana': totRencana, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana,
+      'Uang Kas Perjalanan': S.uangKas, 'Uang Kas Dikembalikan': kasKembali,
+      'Dilaporkan Oleh': u.nama, 'Dilaporkan Pada': now, 'Link PDF': file.getUrl() }]);
+    tulisBaris_(SH_PTJ.PERSONEL, per.map(p => ({ 'Nomor SPD': S.nomor, 'Employee ID': p.ref.id, 'Full Name': p.ref.nama, 'Lama Rencana': p.ref.lama,
+      'Lama Aktual': p.lama, 'Uang Saku Rencana': p.ref.uangSaku, 'Uang Saku Realisasi': p.uangSaku, 'Keterangan': p.keterangan })));
+    tulisBaris_(SH_PTJ.BIAYA, biaya.map((b, i) => ({ 'Nomor SPD': S.nomor, 'No': i + 1, 'Jenis Biaya': String(b.jenis).trim(),
+      'Uraian': String(b.uraian || '').trim(), 'Jumlah (Rp)': Number(b.jumlah) || 0, 'Bukti': String(b.bukti || '') })));
 
     // tutup Surat Perintah Dinas
-    pastikanKolom_(SH.SPD, ['Tgl Laporan', 'Total Realisasi', 'Selisih', 'Link PDF Laporan']);
+    pastikanKolom_(SH.SPD, ['Tgl Laporan', 'Total Realisasi', 'Selisih', 'Uang Kas Dikembalikan', 'Link PDF Laporan']);
     const Ind = bacaBaris_SPD_induk_(), I = Ind.rows.find(x => x['Nomor SPD'] === S.nomor);
-    if (I) ubahBaris_(Ind, I._row, { 'Status Dinas': 'Selesai', 'Tgl Laporan': now, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana, 'Link PDF Laporan': file.getUrl() });
+    if (I) ubahBaris_(Ind, I._row, { 'Status Dinas': 'Selesai', 'Tgl Laporan': now, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana, 'Uang Kas Dikembalikan': kasKembali, 'Link PDF Laporan': file.getUrl() });
     SpreadsheetApp.flush();
 
     const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(u.nama) + '.</p>' +
-      '<p>Total rencana ' + rpH_(totRencana) + ' · realisasi <b>' + rpH_(totReal) + '</b> · selisih ' + rpH_(totReal - totRencana) + '.</p>' +
+      '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + ' = <b>' + kasTeks_(kasKembali) + '</b>.<br>' +
+      'Uang saku ' + rpH_(sakuReal) + ' dibayarkan melalui aplikasi KantorKu.</p>' +
       '<p>PDF laporan terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
     const admin = String(P.EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(S.emailPembuat || u.email).toLowerCase();
     kirimEmail_(pembuat, 'Laporan Pertanggungjawaban Dinas ' + S.nomor, isi, admin && admin !== pembuat ? admin : '', pdf);
-    logAksi_('SPD', S.nomor, 'PERTANGGUNGJAWABAN', u.email, 'Realisasi ' + rpH_(totReal) + ', selisih ' + rpH_(totReal - totRencana));
-    hasil = { ok: true, nomor: S.nomor, totalRencana: totRencana, totalRealisasi: totReal, selisih: totReal - totRencana, pdf: file.getUrl() };
+    logAksi_('SPD', S.nomor, 'PERTANGGUNGJAWABAN', u.email, 'Kas ' + rpH_(S.uangKas) + ' − biaya ' + rpH_(lainReal) + ' → ' + kasTeks_(kasKembali));
+    hasil = { ok: true, nomor: S.nomor, uangKas: S.uangKas, biayaLain: lainReal, kasKembali: kasKembali, uangSaku: sakuReal, pdf: file.getUrl() };
   } finally { lock.releaseLock(); }
   return hasil;
+}
+
+/** Teks hasil uang kas: positif = dikembalikan, negatif = kekurangan */
+function kasTeks_(n) {
+  return n > 0 ? 'uang kas dikembalikan ' + rpH_(n) : n < 0 ? 'kekurangan kas ' + rpH_(-n) + ' (dibayar perusahaan)' : 'uang kas habis terpakai (Rp 0)';
 }
 
 function buatPdfPtj_(S, R) {
@@ -148,7 +163,6 @@ function buatPdfPtj_(S, R) {
   const totRow = (lbl, span, nilai, sisa) => '<tr><td colspan="' + span + '" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + lbl +
     '</td><td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + nilai + '</td>' +
     (sisa ? '<td colspan="' + sisa + '" style="border:1px solid #BBB;background:#EFF0F2"></td>' : '') + '</tr>';
-  const selisih = R.totReal - R.totRencana;
   const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
     kopPdf_('LAPORAN PERTANGGUNGJAWABAN PERJALANAN DINAS', S.nomor) +
     sek('A. DATA SURAT PERINTAH DINAS') +
@@ -158,7 +172,7 @@ function buatPdfPtj_(S, R) {
     sek('B. REALISASI PERJALANAN') +
     kv([['Berangkat Aktual', tg(R.berangkat), 'Kembali Aktual', tg(R.kembali)],
         ['Lama Aktual', R.lamaAktual + ' hari', 'Pengesahan Tujuan', R.pengesahan ? 'Diterima' : 'Belum diterima']]) +
-    sek('C. PERSONEL & UANG SAKU') +
+    sek('C. PERSONEL & UANG SAKU (DIBAYARKAN MELALUI APLIKASI KANTORKU)') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'].map(thP_).join('') + '</tr>' +
     R.personel.map((p, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(p.ref.id)) + tdP_('<b>' + escH_(p.ref.nama) + '</b>') +
       tdP_(p.ref.lama + ' hari', 'text-align:center') + tdP_(p.lama + ' hari', 'text-align:center') + tdP_(rpH_(p.ref.uangSaku), 'text-align:right') +
@@ -168,12 +182,14 @@ function buatPdfPtj_(S, R) {
     (R.biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
       R.biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b.jenis)) + tdP_(escH_(b.uraian)) + tdP_(rpH_(b.jumlah), 'text-align:right') + tdP_(escH_(b.bukti), 'text-align:center') + '</tr>').join('') +
       totRow('TOTAL BIAYA LAINNYA', 3, rpH_(R.lainReal), 1) + '</table>' : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
-    '<table style="width:100%;margin-top:8px;border-collapse:collapse;font-size:10px">' +
-    [['Total Rencana (uang saku personel disetujui + biaya lainnya)', rpH_(R.totRencana)], ['Total Realisasi', rpH_(R.totReal)],
-     [selisih > 0 ? 'Kurang Bayar (realisasi > rencana)' : selisih < 0 ? 'Lebih Bayar (realisasi < rencana)' : 'Selisih', rpH_(Math.abs(selisih))]]
-      .map((r, i) => '<tr><td style="padding:5px;border:' + (i === 1 ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
-        (i === 1 ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>').join('') + '</table>' +
-    sek('E. RINGKASAN HASIL KEGIATAN') +
+    sek('E. PERHITUNGAN UANG KAS DALAM PERJALANAN') +
+    '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
+    [['Uang kas dalam perjalanan (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )'],
+     [R.kasKembali >= 0 ? 'UANG KAS YANG HARUS DIKEMBALIKAN' : 'KEKURANGAN UANG KAS (dibayarkan perusahaan)', rpH_(Math.abs(R.kasKembali))]]
+      .map((r, i) => '<tr><td style="padding:5px;border:' + (i === 2 ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
+        (i === 2 ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>').join('') + '</table>' +
+    '<div style="font-size:9px;color:#555;margin-top:4px">Uang saku personel ' + rpH_(R.sakuReal) + ' dibayarkan melalui aplikasi KantorKu dan tidak termasuk perhitungan uang kas.</div>' +
+    sek('F. RINGKASAN HASIL KEGIATAN') +
     '<div style="border:1px solid #BBB;padding:8px;font-size:10px;white-space:pre-wrap;min-height:40px">' + escH_(R.ringkasan) + '</div>' +
     '<p style="text-align:right;font-size:10px;margin-top:12px">' + (param_().KOTA_SURAT ? escH_(param_().KOTA_SURAT) + ', ' : '') + tglIndo_(R.pada) + '</p>' +
     '<table style="width:100%;margin-top:6px;font-size:10px;text-align:center"><tr><td>Dilaporkan oleh,</td><td>Diperiksa oleh,</td><td>Disetujui oleh,</td></tr>' +

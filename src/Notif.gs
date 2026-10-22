@@ -136,11 +136,12 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
     ['Personel', r['Full Name'] + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
-    ['Uang Saku', rpH_(r['Uang Saku'])],
+    ['Uang Saku', rpH_(r['Uang Saku']) + ' (dibayarkan melalui aplikasi KantorKu)'],
+  ].concat(Number(I['Uang Kas Perjalanan']) ? [['Uang Kas Perjalanan', rpH_(I['Uang Kas Perjalanan']) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
     ['Diperintahkan oleh', namaAtasan_(r['Employee ID']) || I['Dibuat Oleh']]
-  ];
+  ]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b =>
     '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' + escH_(b[0]) +
     '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
@@ -432,7 +433,8 @@ function buatPdfSPD_(I, rows) {
     kv([['Maksud / Tujuan', I['Maksud / Tujuan'], 'Tempat Tujuan', I['Tempat Tujuan']],
         ['Tgl. Berangkat', hariIndo_(tglB) + ', ' + tglIndo_(tglB), 'Tgl. Kembali', hariIndo_(tglK) + ', ' + tglIndo_(tglK)],
         ['Lama Dinas', I['Lama (hari)'] + ' hari', 'Transportasi', I['Transportasi']],
-        ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)]]) +
+        ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
+        ['Uang Kas Perjalanan', rpH_(Number(I['Uang Kas Perjalanan']) || 0)]]) +
     sek('C. PERSONEL YANG DITUGASKAN') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Uang Saku', 'Keterangan', 'Status', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' +
     rows.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
@@ -450,7 +452,8 @@ function buatPdfSPD_(I, rows) {
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
     '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +
     '<li>Selama tanggal dinas luar tidak dapat diajukan lembur; pengajuan lembur pada tanggal tersebut akan ditolak.</li>' +
-    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari).</li>' +
+    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari) dan dibayarkan melalui aplikasi KantorKu.</li>' +
+    '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) = uang kas yang harus dikembalikan.</li>' +
     '<li>Mintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan sebagai bukti kehadiran.</li>' +
     '<li>Laporan perjalanan dinas beserta bukti pengeluaran diserahkan ke Admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
     sek('F. PENGESAHAN DI TEMPAT TUJUAN') +

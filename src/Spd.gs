@@ -11,11 +11,12 @@
 /**
  * @param {string} token
  * @param {{tanggalSurat, noReferensi, customer, dasarPenugasan, maksud, tempat, berangkat, kembali,
- *          transportasi, sumberBiaya, personel:[{id, lama, keterangan}], biaya:[{jenis, uraian, jumlah, bukti}]}} d
+ *          transportasi, sumberBiaya, uangKas, personel:[{id, lama, keterangan}], biaya:[{jenis, uraian, jumlah, bukti}]}} d
  */
 function simpanSPD(token, d) {
   const u = sesiCek_(token);
   pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
+  pastikanKolom_(SH.SPD, ['Uang Kas Perjalanan']);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba simpan lagi beberapa detik lagi.');
   let hasilSimpan;
@@ -36,6 +37,8 @@ function simpanSPD(token, d) {
     cekPilihan(d.sumberBiaya, pil['Sumber Biaya'], 'Sumber biaya');
     if (!teks(d.transportasi)) err.push('Transportasi wajib dipilih.');
     if (!teks(d.sumberBiaya)) err.push('Sumber biaya wajib dipilih.');
+    const uangKas = Number(d.uangKas);
+    if (d.uangKas === '' || d.uangKas == null || !(uangKas >= 0)) err.push('Uang kas dalam perjalanan wajib diisi (isi 0 bila tidak ada).');
 
     const personel = (d.personel || []).filter(p => p && teks(p.id)).map(p => Object.assign({}, p, { id: teks(p.id).toUpperCase() }));
     const biaya = (d.biaya || []).filter(b => b && (teks(b.jenis) || Number(b.jumlah)));
@@ -71,7 +74,7 @@ function simpanSPD(token, d) {
       'Dasar Penugasan': teks(d.dasarPenugasan), 'Maksud / Tujuan': teks(d.maksud), 'Tempat Tujuan': teks(d.tempat),
       'Tgl Berangkat': tp(d.berangkat), 'Tgl Kembali': tp(d.kembali), 'Lama (hari)': h.lama,
       'Transportasi': teks(d.transportasi), 'Sumber Biaya': teks(d.sumberBiaya),
-      'Total Uang Saku': h.totalUangSaku, 'Total Biaya Lain': h.totalBiayaLain, 'Total Biaya': h.totalBiaya,
+      'Uang Kas Perjalanan': uangKas || 0, 'Total Uang Saku': h.totalUangSaku, 'Total Biaya Lain': h.totalBiayaLain, 'Total Biaya': h.totalBiaya,
       'Status Dinas': 'Aktif', 'Departemen': u.departemen,
       'Dibuat Oleh': u.nama, 'Email Pembuat': u.email, 'Dibuat Pada': now,
       'Status': alur.status,
@@ -114,7 +117,7 @@ function riwayatSPD(token) {
       berangkat: r['Tgl Berangkat'] instanceof Date ? ymd_(r['Tgl Berangkat']) : '',
       kembali: r['Tgl Kembali'] instanceof Date ? ymd_(r['Tgl Kembali']) : '',
       lama: Number(r['Lama (hari)']) || 0, tempat: r['Tempat Tujuan'], maksud: r['Maksud / Tujuan'],
-      totalBiaya: Number(r['Total Biaya']) || 0,
+      totalBiaya: Number(r['Total Biaya']) || 0, uangKas: Number(r['Uang Kas Perjalanan']) || 0,
       dibuat: r['Dibuat Pada'] instanceof Date ? r['Dibuat Pada'].getTime() : 0,
       orang: per[r['Nomor SPD']] || [], pdf: r['Link PDF'] || '', pdfLaporan: r['Link PDF Laporan'] || '',
       statusDinas: String(r['Status Dinas'] || 'Aktif') === 'Selesai' ? 'SELESAI' : 'OPEN'

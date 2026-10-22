@@ -9,7 +9,7 @@ window.google={script:{get run(){return mkRun()}}};
 const RW_SPL=[{jenis:'SPL',nomor:'001 / SPL / CBA / X / 2026',tanggal:'2026-10-21',hari:'Rabu',statusHari:'Hari Kerja',status:'MENUNGGU MANAGER',dibuat:1,orang:[{nama:'BUDI SANTOSO',mulai:'16:00',selesai:'22:00',jam:5,uraian:'Welding frame project X'}],totalJam:5}];
 const RW_SPD=[{jenis:'SPD',nomor:'001 / SPD / CBA / X / 2026',status:'DISETUJUI',tanggal:'2026-10-20',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,tempat:'Cilegon',maksud:'Survey lokasi proyek',totalBiaya:600000,dibuat:0,orang:[{nama:'RINA MARLINA',lama:3,keterangan:''}]}];
 let nSPL=1,nSPD=1;
-let OPENS=[{nomor:'001 / SPD / CBA / X / 2026',tempat:'Cilegon',maksud:'Survey lokasi proyek',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,transportasi:'Kendaraan Dinas',customer:'PT X',selesaiApproval:true,uangSakuRencana:300000,biayaRencana:150000,personel:[{id:'K004',nama:'RINA MARLINA',jabatan:'STAFF',lama:3,status:'DISETUJUI'},{id:'K005',nama:'HENDRA WIJAYA',jabatan:'STAFF',lama:3,status:'TIDAK BERSEDIA'}],biaya:[{jenis:'Konsumsi',uraian:'Makan',jumlah:150000,bukti:'Ada'}]},{nomor:'002 / SPD / CBA / X / 2026',tempat:'Bandung',maksud:'Instalasi',berangkat:'2026-11-02',kembali:'2026-11-03',lama:2,selesaiApproval:false,uangSakuRencana:0,biayaRencana:0,personel:[{id:'K001',nama:'BUDI SANTOSO',lama:2,status:'MENUNGGU KONFIRMASI'}],biaya:[]}];
+let OPENS=[{nomor:'001 / SPD / CBA / X / 2026',tempat:'Cilegon',maksud:'Survey lokasi proyek',berangkat:'2026-10-27',kembali:'2026-10-29',lama:3,transportasi:'Kendaraan Dinas',customer:'PT X',selesaiApproval:true,uangKas:500000,uangSakuRencana:300000,biayaRencana:150000,personel:[{id:'K004',nama:'RINA MARLINA',jabatan:'STAFF',lama:3,status:'DISETUJUI'},{id:'K005',nama:'HENDRA WIJAYA',jabatan:'STAFF',lama:3,status:'TIDAK BERSEDIA'}],biaya:[{jenis:'Konsumsi',uraian:'Makan',jumlah:150000,bukti:'Ada'}]},{nomor:'002 / SPD / CBA / X / 2026',tempat:'Bandung',maksud:'Instalasi',berangkat:'2026-11-02',kembali:'2026-11-03',lama:2,selesaiApproval:false,uangSakuRencana:0,biayaRencana:0,personel:[{id:'K001',nama:'BUDI SANTOSO',lama:2,status:'MENUNGGU KONFIRMASI'}],biaya:[]}];
 const dataP={JAM_MULAI_MIN_SENJUM:'16:00',JAM_MULAI_MIN_SABTU:'13:00',JAM_MULAI_MIN_LIBUR:'08:00',JAM_SELESAI_MAKS:'24:00',ISTIRAHAT_HARI_KERJA:'18:00-19:00',ISTIRAHAT_HARI_LIBUR:'12:00-13:00',BATAS_SELESAI_LIBUR:'18:00',PEMBAGI_TARIF:173,FAKTOR_HARI_KERJA:1.5,FAKTOR_HARI_LIBUR:2};
 window.SERVER={
  loginOtomatis:()=>({token:null}),
@@ -26,7 +26,7 @@ window.SERVER={
  estimasiSPL:(t,d)=>d.baris.map(b=>{if(!(b.id&&b.mulai&&b.selesai&&d.tanggal))return null;const h=hitungLembur_({tanggal:d.tanggal,mulai:b.mulai,selesai:b.selesai,gaji:4642000},dataP,Object.assign({},{'2026-12-25':1},d.liburNasional?{[d.tanggal]:1}:{}));return h.error.length?null:h.kompensasi}),
  riwayatSPL:()=>RW_SPL, riwayatSPD:()=>RW_SPD,
  spdOpen:()=>OPENS,
- simpanPtjSPD:(t,d)=>{window.PTJ=d;OPENS=OPENS.filter(o=>o.nomor!==d.nomor);return {ok:true,nomor:d.nomor,totalRencana:450000,totalRealisasi:730000,selisih:280000,pdf:'#'}}
+ simpanPtjSPD:(t,d)=>{window.PTJ=d;OPENS=OPENS.filter(o=>o.nomor!==d.nomor);return {ok:true,nomor:d.nomor,uangKas:500000,biayaLain:430000,kasKembali:70000,uangSaku:300000,pdf:'#'}}
 };
 </script><meta name="viewport" content="width=device-width, initial-scale=1"><title>Demo Form SPL & SPD</title>
 <base target="_top">
@@ -271,6 +271,10 @@ window.SERVER={
           <div><label>Sumber Biaya *</label><select id="dSumber" onchange="hitungSPD()"></select></div>
           <div><label>Uang Saku / Orang</label><div class="chip" id="dSaku">–</div></div>
         </div>
+        <div class="row" style="margin:12px 0 0">
+          <div style="max-width:260px"><label>Uang Kas dalam Perjalanan (Rp) *</label><input id="dKas" type="number" min="0" step="1000" placeholder="isi 0 bila tidak ada" oninput="hitungSPD()"><div class="sub" id="dKasF"></div></div>
+          <div><label>&nbsp;</label><div class="sub" style="padding-top:6px">Uang saku dibayarkan melalui aplikasi KantorKu. Uang kas dipertanggungjawabkan setelah kembali: uang kas − biaya lainnya = uang kas yang harus dikembalikan.</div></div>
+        </div>
       </div>
       <div class="card" style="padding:0">
         <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan <span class="sub">(maks. <span id="dMaks">5</span> orang — bila lebih, buat surat baru)</span></div>
@@ -290,9 +294,10 @@ window.SERVER={
         <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="spdTambahBiaya()">+ Tambah biaya</button></div>
       </div>
       <div class="card">
-        <div class="total"><span>Total uang saku</span><b id="tSaku">Rp 0</b></div>
+        <div class="total"><span>Total uang saku <span class="sub">(dibayar via KantorKu)</span></span><b id="tSaku">Rp 0</b></div>
         <div class="total"><span>Total biaya lainnya</span><b id="tLain">Rp 0</b></div>
         <div class="total besar"><span>TOTAL BIAYA PERJALANAN DINAS</span><span id="tAll">Rp 0</span></div>
+        <div class="total" style="margin-top:8px"><span>Uang kas dalam perjalanan</span><b id="tKas">Rp 0</b></div>
       </div>
       <div id="dErr"></div>
       <div class="bar" style="justify-content:flex-end"><button class="btn" id="dKirim" onclick="spdKonfirmasi()">Kirim Surat</button></div>
@@ -313,7 +318,7 @@ window.SERVER={
           </div>
         </div>
         <div class="card" style="padding:0">
-          <div class="sek" style="padding:14px 16px 0">C. Personel &amp; Uang Saku <span class="sub">(isi 0 bila personel batal berangkat)</span></div>
+          <div class="sek" style="padding:14px 16px 0">C. Personel &amp; Uang Saku <span class="sub">(dibayarkan melalui aplikasi KantorKu · isi 0 bila personel batal berangkat)</span></div>
           <table class="mob">
             <thead><tr><th>No</th><th style="min-width:200px">Personel</th><th>Lama Rencana</th><th>Lama Aktual (hari)</th><th>Uang Saku Realisasi</th><th style="min-width:160px">Keterangan</th></tr></thead>
             <tbody id="tPer"></tbody>
@@ -334,11 +339,13 @@ window.SERVER={
           <label class="cek" style="margin-top:10px"><input type="checkbox" id="tSah"> Bukti pengesahan (tanda tangan &amp; stempel) di tempat tujuan sudah diterima</label>
         </div>
         <div class="card">
+          <div class="sek">Perhitungan Uang Kas dalam Perjalanan</div>
           <div class="tot3">
-            <div><span class="sub">Total rencana</span><b id="tRen">-</b></div>
-            <div><span class="sub">Total realisasi</span><b id="tRea">-</b></div>
-            <div><span class="sub" id="tSelL">Selisih</span><b id="tSel">-</b></div>
+            <div><span class="sub">Uang kas dalam perjalanan</span><b id="tRen">-</b></div>
+            <div><span class="sub">Biaya lainnya (realisasi)</span><b id="tRea">-</b></div>
+            <div><span class="sub" id="tSelL">Harus dikembalikan</span><b id="tSel">-</b></div>
           </div>
+          <div class="sub" style="margin-top:8px">Uang saku <b id="tSakuR">-</b> dibayarkan melalui aplikasi KantorKu (tidak termasuk perhitungan uang kas).</div>
         </div>
         <div id="tErr"></div>
         <div class="bar" style="justify-content:flex-end">
@@ -745,7 +752,7 @@ async function splKirim() {
    ===================================================================== */
 let PROWS = [], BROWS = [], SPD_OK = false;
 function spdBaru() {
-  ['dRef', 'dCustomer', 'dMaksud', 'dTempat', 'dBrk', 'dKmb'].forEach(i => $(i).value = '');
+  ['dRef', 'dCustomer', 'dMaksud', 'dTempat', 'dBrk', 'dKmb', 'dKas'].forEach(i => $(i).value = '');
   $('dTglSurat').value = hariIni();
   $('dDasar').innerHTML = opsi(D.pilihan.dasarPenugasan, '', '— pilih —');
   $('dTrans').innerHTML = opsi(D.pilihan.transportasi, '', '— pilih —');
@@ -838,6 +845,9 @@ function hitungSPD(tglBerubah) {
   else if (k < b) umum.push('Tanggal kembali lebih awal dari tanggal berangkat.');
   if (!$('dTrans').value) umum.push('Pilih transportasi.');
   if (!$('dSumber').value) umum.push('Pilih sumber biaya.');
+  const kas = $('dKas').value;
+  if (kas === '' || !(Number(kas) >= 0)) umum.push('Isi uang kas dalam perjalanan (isi 0 bila tidak ada).');
+  $('dKasF').textContent = kas !== '' ? rp(kas) : ''; $('tKas').textContent = rp(Number(kas) || 0);
   if (!per.length) umum.push('Isi minimal 1 personel.');
   const warn = h.peringatan;
   SPD_OK = !adaErr && !umum.length;
@@ -850,7 +860,7 @@ function spdData() {
   return {
     tanggalSurat: $('dTglSurat').value, noReferensi: $('dRef').value, customer: $('dCustomer').value, dasarPenugasan: $('dDasar').value,
     maksud: $('dMaksud').value, tempat: $('dTempat').value, berangkat: $('dBrk').value, kembali: $('dKmb').value,
-    transportasi: $('dTrans').value, sumberBiaya: $('dSumber').value,
+    transportasi: $('dTrans').value, sumberBiaya: $('dSumber').value, uangKas: $('dKas').value === '' ? '' : Number($('dKas').value),
     personel: PROWS.map(r => ({ id: r.el.querySelector('.k').value, lama: Number(r.el.querySelector('.lm').value), keterangan: r.el.querySelector('.ket').value })).filter(p => p.id),
     biaya: BROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(r.el.querySelector('.jm').value) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
   };
@@ -860,7 +870,7 @@ function spdKonfirmasi() {
   if (!SPD_OK) { if (umum.length) pesan('dErr', 'err', umum.map(esc).join('<br>')); return; }
   const d = spdData();
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Dinas</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
-    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b><br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="spdKirim()">Ya, kirim</button></div>');
 }
 async function spdKirim() {
@@ -905,7 +915,7 @@ function pilihPtj(nomor) {
   $('ptjList').classList.add('hide'); $('ptjForm').classList.remove('hide');
   $('ptjInfo').innerHTML = '<div class="sek">A. Surat Perintah Dinas</div><b style="font-size:16px">' + esc(PT.nomor) + '</b>' +
     '<div class="sub" style="font-size:13px;margin-top:4px">' + esc(PT.maksud) + '<br>Tujuan: <b>' + esc(PT.tempat) + '</b> · Rencana ' + tglPanjang(PT.berangkat) + ' s/d ' + tglPanjang(PT.kembali) +
-    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '</div>';
+    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '<br>Uang kas dalam perjalanan: <b>' + rp(PT.uangKas || 0) + '</b></div>';
   $('tBrk').value = PT.berangkat; $('tKmb').value = PT.kembali; $('tRingkas').value = ''; $('tSah').checked = false;
   const per = PT.personel.filter(p => p.status === 'DISETUJUI');
   $('tPer').innerHTML = per.length ? per.map((p, i) => '<tr data-id="' + esc(p.id) + '"><td class="n">' + (i + 1) + '</td>' +
@@ -961,10 +971,10 @@ function hitungPtj() {
     lain += Number(jm) || 0;
   });
   if (!$('tRingkas').value.trim()) e.push('Isi ringkasan hasil kegiatan.');
-  const ren = PT.uangSakuRencana + PT.biayaRencana, rea = saku + lain, sel = rea - ren;
-  $('tRen').textContent = rp(ren); $('tRea').textContent = rp(rea);
-  $('tSelL').textContent = sel > 0 ? 'Kurang bayar' : sel < 0 ? 'Lebih bayar' : 'Selisih';
-  $('tSel').textContent = rp(Math.abs(sel));
+  const kas = PT.uangKas || 0, sisa = kas - lain;
+  $('tRen').textContent = rp(kas); $('tRea').textContent = rp(lain); $('tSakuR').textContent = rp(saku);
+  $('tSelL').textContent = sisa < 0 ? 'Kekurangan kas (dibayar perusahaan)' : 'Uang kas harus dikembalikan';
+  $('tSel').textContent = rp(Math.abs(sisa));
   PTJ_OK = !e.length; $('tSimpan').disabled = !PTJ_OK; $('tSimpan').title = [...new Set(e)].join('\n');
   return [...new Set(e)];
 }
@@ -978,7 +988,7 @@ function ptjData() {
 function ptjKonfirmasi() {
   const e = hitungPtj();
   if (!PTJ_OK) { pesan('tErr', 'err', e.map(esc).join('<br>')); return; }
-  modal('<h3 style="margin-top:0">Simpan Pertanggungjawaban</h3><p><b>' + esc(PT.nomor) + '</b><br>' + esc(PT.tempat) + '<br>Total realisasi <b>' + $('tRea').textContent + '</b></p>' +
+  modal('<h3 style="margin-top:0">Simpan Pertanggungjawaban</h3><p><b>' + esc(PT.nomor) + '</b><br>' + esc(PT.tempat) + '<br>' + $('tSelL').textContent + ' <b>' + $('tSel').textContent + '</b></p>' +
     '<p class="sub">Setelah disimpan, status surat menjadi SELESAI dan laporan PDF dikirim ke admin.</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="ptjKirim()">Ya, simpan</button></div>');
 }
@@ -988,7 +998,7 @@ async function ptjKirim() {
     const r = await run('simpanPtjSPD', TOKEN, ptjData());
     if (!r.ok) { tutupModal(); pesan('tErr', 'err', '<b>Belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
     modal('<h3 style="margin-top:0;color:var(--ok)">✅ Pertanggungjawaban tersimpan</h3><p><b>' + esc(r.nomor) + '</b> — status <span class="st SELESAI">SELESAI</span></p>' +
-      '<p>Rencana ' + rp(r.totalRencana) + ' · Realisasi <b>' + rp(r.totalRealisasi) + '</b><br>' + (r.selisih > 0 ? 'Kurang bayar ' : r.selisih < 0 ? 'Lebih bayar ' : 'Selisih ') + rp(Math.abs(r.selisih)) + '</p>' +
+      '<p>Uang kas ' + rp(r.uangKas) + ' − biaya lainnya ' + rp(r.biayaLain) + '<br>' + (r.kasKembali < 0 ? 'Kekurangan kas (dibayar perusahaan) ' : 'Uang kas harus dikembalikan ') + '<b>' + rp(Math.abs(r.kasKembali)) + '</b></p>' +
       '<p><a href="' + esc(r.pdf) + '" target="_blank">📄 Buka PDF laporan</a></p>' +
       '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();tutupPtj();muatOpen()">Selesai</button></div>');
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('tErr', 'err', esc(errText(e))); }
