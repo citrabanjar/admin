@@ -10,7 +10,6 @@ function onOpen() {
     .addItem('1. Setup awal (jalankan sekali)', 'setupAwal')
     .addItem('2. Cek data karyawan', 'cekDataKaryawan')
     .addItem('3. Tes hitung lembur & SPD', 'tesHitung')
-    .addItem('4. Sinkron data karyawan dari sheet lain', 'sinkronKaryawan')
     .addSeparator()
     .addItem('🔗 Link form SPL & SPD', 'bukaForm')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
