@@ -23,10 +23,10 @@ function setupAwal() {
   PropertiesService.getScriptProperties().setProperty('SS_ID', ss.getId());
 
   // Cek semua sheet yang dibutuhkan ada
-  const hilang = Object.values(SH).filter(n => !ss.getSheetByName(n));
+  const hilang = Object.values(SH).filter(n => !cariSheet_(ss, n));
   if (hilang.length) {
     SpreadsheetApp.getUi().alert('Sheet berikut tidak ditemukan:\n• ' + hilang.join('\n• ') +
-      '\n\nPastikan file yang dipakai adalah hasil upload Database_SPL_SPD.xlsx.');
+      '\n\nPastikan nama sheet sesuai (sheet karyawan boleh bernama "Karyawan" atau "Data Karyawan").');
     return;
   }
 
@@ -40,15 +40,21 @@ function setupAwal() {
     sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(p => p.remove());
     sh.protect().setDescription('Diisi otomatis oleh sistem SPL/SPD').setWarningOnly(true);
   });
-  // Kolom Departemen di Karyawan berisi rumus — kunci dengan peringatan
-  const shK = ss.getSheetByName(SH.KARYAWAN);
-  shK.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(p => p.remove());
-  shK.getRange(2, kolom_(SH.KARYAWAN)['Departemen'], shK.getMaxRows() - 1, 1)
-     .protect().setDescription('Rumus otomatis Departemen').setWarningOnly(true);
+  // Cek kolom wajib di sheet karyawan
+  const kk = kolom_(SH.KARYAWAN);
+  const kurang = ['Employee ID', 'Full Name', 'Job Position', 'Organization', 'Email'].filter(j => !kk[j]);
+  if (kurang.length) SpreadsheetApp.getUi().alert('⚠ Kolom berikut belum ada di sheet karyawan:\n• ' + kurang.join('\n• ') +
+    '\n\nJudul kolom harus persis seperti di atas.');
+  if (!kk['Peran']) {
+    const shK = sheet_(SH.KARYAWAN), col = shK.getLastColumn() + 1;
+    shK.getRange(1, col).setValue('Peran').setFontWeight('bold');
+    shK.getRange(2, col, shK.getMaxRows() - 1, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
+  }
 
   logAksi_('-', '-', 'SETUP AWAL', Session.getActiveUser().getEmail(), 'Zona waktu ' + TZ + ', proteksi sheet sistem.');
   SpreadsheetApp.getUi().alert('✅ Setup awal selesai.\n\n• Zona waktu: ' + TZ +
-    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
+    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n• Kolom Peran tersedia di sheet karyawan (kosong = otomatis dari jabatan)\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
 }
 
 /** Periksa kelengkapan master karyawan sebelum notifikasi email diaktifkan. */

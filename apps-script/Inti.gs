@@ -25,8 +25,13 @@ function ss_() {
   if (!id) throw new Error('SS_ID belum tersimpan. Jalankan menu "Setup awal" dari spreadsheet.');
   return SpreadsheetApp.openById(id);
 }
+/** Nama lain yang juga diterima untuk sheet tertentu */
+const SH_ALTERNATIF = { 'Karyawan': ['Data Karyawan', 'Master Karyawan'] };
+function cariSheet_(ss, nama) {
+  return [nama].concat(SH_ALTERNATIF[nama] || []).map(n => ss.getSheetByName(n)).find(Boolean) || null;
+}
 function sheet_(nama) {
-  const sh = ss_().getSheetByName(nama);
+  const sh = cariSheet_(ss_(), nama);
   if (!sh) throw new Error('Sheet "' + nama + '" tidak ditemukan.');
   return sh;
 }
@@ -63,21 +68,38 @@ function param_() {
 
 /* ---------- Master karyawan ---------- */
 let _K = null;
+/** Departemen dari Organization: teks sebelum " GROUP", ejaan DEPARTMENT diseragamkan jadi DEPARTEMENT */
+function departemenDari_(org) {
+  const o = String(org || '').toUpperCase().trim().replace(/DEPARTMENT/g, 'DEPARTEMENT');
+  const i = o.indexOf(' GROUP');
+  return i > 0 ? o.slice(0, i).trim() : o;
+}
+/** Peran default dari jabatan (dipakai bila kolom Peran kosong / tidak ada) */
+function peranDefault_(jabatan) {
+  return ({ FOREMAN: 'PEMBUAT', SUPERVISOR: 'PEMBUAT', MANAGER: 'MANAGER' })[String(jabatan || '').toUpperCase().trim()] || 'KARYAWAN';
+}
+
+/** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
+ *  Opsional: Basic Salary, Departemen, Peran (kosong = default dari jabatan),
+ *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
 function karyawan_() {
   if (_K) return _K;
   _K = {};
   bacaTabel_(SH.KARYAWAN, 'Employee ID').forEach(r => {
     const id = String(r['Employee ID']).trim().toUpperCase();
+    const jab = String(r['Job Position'] || '').trim();
+    const statusEmp = String(r['Status Employee'] || '').trim();
+    const aktifKol = String(r['Aktif'] || '').trim().toUpperCase();
     _K[id] = {
       id: id,
-      nama: String(r['Full Name']).trim(),
-      jabatan: String(r['Job Position']).trim(),
-      organisasi: String(r['Organization']).trim(),
-      departemen: String(r['Departemen']).trim(),
+      nama: String(r['Full Name'] || '').trim(),
+      jabatan: jab,
+      organisasi: String(r['Organization'] || '').trim(),
+      departemen: String(r['Departemen'] || '').trim() || departemenDari_(r['Organization']),
       gaji: Number(r['Basic Salary']) || 0,           // RAHASIA — jangan dikirim ke form/email karyawan
-      email: String(r['Email']).trim().toLowerCase(),
-      peran: String(r['Peran']).trim().toUpperCase() || 'KARYAWAN',
-      aktif: String(r['Aktif']).trim().toUpperCase() !== 'TIDAK'
+      email: String(r['Email'] || '').trim().toLowerCase(),
+      peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
+      aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
   return _K;

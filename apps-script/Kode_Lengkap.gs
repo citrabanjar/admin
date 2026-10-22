@@ -25,8 +25,13 @@ function ss_() {
   if (!id) throw new Error('SS_ID belum tersimpan. Jalankan menu "Setup awal" dari spreadsheet.');
   return SpreadsheetApp.openById(id);
 }
+/** Nama lain yang juga diterima untuk sheet tertentu */
+const SH_ALTERNATIF = { 'Karyawan': ['Data Karyawan', 'Master Karyawan'] };
+function cariSheet_(ss, nama) {
+  return [nama].concat(SH_ALTERNATIF[nama] || []).map(n => ss.getSheetByName(n)).find(Boolean) || null;
+}
 function sheet_(nama) {
-  const sh = ss_().getSheetByName(nama);
+  const sh = cariSheet_(ss_(), nama);
   if (!sh) throw new Error('Sheet "' + nama + '" tidak ditemukan.');
   return sh;
 }
@@ -63,21 +68,38 @@ function param_() {
 
 /* ---------- Master karyawan ---------- */
 let _K = null;
+/** Departemen dari Organization: teks sebelum " GROUP", ejaan DEPARTMENT diseragamkan jadi DEPARTEMENT */
+function departemenDari_(org) {
+  const o = String(org || '').toUpperCase().trim().replace(/DEPARTMENT/g, 'DEPARTEMENT');
+  const i = o.indexOf(' GROUP');
+  return i > 0 ? o.slice(0, i).trim() : o;
+}
+/** Peran default dari jabatan (dipakai bila kolom Peran kosong / tidak ada) */
+function peranDefault_(jabatan) {
+  return ({ FOREMAN: 'PEMBUAT', SUPERVISOR: 'PEMBUAT', MANAGER: 'MANAGER' })[String(jabatan || '').toUpperCase().trim()] || 'KARYAWAN';
+}
+
+/** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
+ *  Opsional: Basic Salary, Departemen, Peran (kosong = default dari jabatan),
+ *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
 function karyawan_() {
   if (_K) return _K;
   _K = {};
   bacaTabel_(SH.KARYAWAN, 'Employee ID').forEach(r => {
     const id = String(r['Employee ID']).trim().toUpperCase();
+    const jab = String(r['Job Position'] || '').trim();
+    const statusEmp = String(r['Status Employee'] || '').trim();
+    const aktifKol = String(r['Aktif'] || '').trim().toUpperCase();
     _K[id] = {
       id: id,
-      nama: String(r['Full Name']).trim(),
-      jabatan: String(r['Job Position']).trim(),
-      organisasi: String(r['Organization']).trim(),
-      departemen: String(r['Departemen']).trim(),
+      nama: String(r['Full Name'] || '').trim(),
+      jabatan: jab,
+      organisasi: String(r['Organization'] || '').trim(),
+      departemen: String(r['Departemen'] || '').trim() || departemenDari_(r['Organization']),
       gaji: Number(r['Basic Salary']) || 0,           // RAHASIA — jangan dikirim ke form/email karyawan
-      email: String(r['Email']).trim().toLowerCase(),
-      peran: String(r['Peran']).trim().toUpperCase() || 'KARYAWAN',
-      aktif: String(r['Aktif']).trim().toUpperCase() !== 'TIDAK'
+      email: String(r['Email'] || '').trim().toLowerCase(),
+      peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
+      aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
   return _K;
@@ -290,10 +312,10 @@ function setupAwal() {
   PropertiesService.getScriptProperties().setProperty('SS_ID', ss.getId());
 
   // Cek semua sheet yang dibutuhkan ada
-  const hilang = Object.values(SH).filter(n => !ss.getSheetByName(n));
+  const hilang = Object.values(SH).filter(n => !cariSheet_(ss, n));
   if (hilang.length) {
     SpreadsheetApp.getUi().alert('Sheet berikut tidak ditemukan:\n• ' + hilang.join('\n• ') +
-      '\n\nPastikan file yang dipakai adalah hasil upload Database_SPL_SPD.xlsx.');
+      '\n\nPastikan nama sheet sesuai (sheet karyawan boleh bernama "Karyawan" atau "Data Karyawan").');
     return;
   }
 
@@ -307,15 +329,21 @@ function setupAwal() {
     sh.getProtections(SpreadsheetApp.ProtectionType.SHEET).forEach(p => p.remove());
     sh.protect().setDescription('Diisi otomatis oleh sistem SPL/SPD').setWarningOnly(true);
   });
-  // Kolom Departemen di Karyawan berisi rumus — kunci dengan peringatan
-  const shK = ss.getSheetByName(SH.KARYAWAN);
-  shK.getProtections(SpreadsheetApp.ProtectionType.RANGE).forEach(p => p.remove());
-  shK.getRange(2, kolom_(SH.KARYAWAN)['Departemen'], shK.getMaxRows() - 1, 1)
-     .protect().setDescription('Rumus otomatis Departemen').setWarningOnly(true);
+  // Cek kolom wajib di sheet karyawan
+  const kk = kolom_(SH.KARYAWAN);
+  const kurang = ['Employee ID', 'Full Name', 'Job Position', 'Organization', 'Email'].filter(j => !kk[j]);
+  if (kurang.length) SpreadsheetApp.getUi().alert('⚠ Kolom berikut belum ada di sheet karyawan:\n• ' + kurang.join('\n• ') +
+    '\n\nJudul kolom harus persis seperti di atas.');
+  if (!kk['Peran']) {
+    const shK = sheet_(SH.KARYAWAN), col = shK.getLastColumn() + 1;
+    shK.getRange(1, col).setValue('Peran').setFontWeight('bold');
+    shK.getRange(2, col, shK.getMaxRows() - 1, 1).setDataValidation(
+      SpreadsheetApp.newDataValidation().requireValueInList(PERAN, true).setAllowInvalid(false).build());
+  }
 
   logAksi_('-', '-', 'SETUP AWAL', Session.getActiveUser().getEmail(), 'Zona waktu ' + TZ + ', proteksi sheet sistem.');
   SpreadsheetApp.getUi().alert('✅ Setup awal selesai.\n\n• Zona waktu: ' + TZ +
-    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
+    '\n• Sheet sistem dikunci (peringatan bila diedit manual)\n• Kolom Peran tersedia di sheet karyawan (kosong = otomatis dari jabatan)\n\nLangkah berikut: menu ⚙️ SPL / SPD → 2. Cek data karyawan.');
 }
 
 /** Periksa kelengkapan master karyawan sebelum notifikasi email diaktifkan. */
