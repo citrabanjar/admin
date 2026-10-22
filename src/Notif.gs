@@ -18,7 +18,7 @@ const ST = {
   SETUJU: 'DISETUJUI', TOLAK: 'DITOLAK', BATAL: 'DIBATALKAN'
 };
 const ST_FINAL = [ST.TIDAK, ST.SETUJU, ST.TOLAK, ST.BATAL];
-const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'KantorKu'];
+const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'Link PDF Atasan', 'KantorKu'];
 const KOLOM_SPD_TAMBAHAN = ['Status', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Atasan', 'Email Atasan',
   'Disetujui Oleh', 'Disetujui Pada', 'Catatan Atasan', 'Status Email', 'ID Baris'];
 
@@ -367,7 +367,7 @@ function rekapSPL_(nomor, paksa) {
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     milik.forEach(r => ubahBaris_(S, r._row, { 'Link PDF': file.getUrl() }));
-    kirimRekap_(em, milik, file, pdf, lama.length > 0, false);
+    kirimRekap_(em, milik, file, pdf, lama.length > 0, '', false);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ADMIN DIPERBARUI' : 'PDF REKAP ADMIN', em, file.getUrl());
     hasil.push('PDF rekap dikirim ke ' + em);
   }
@@ -380,20 +380,37 @@ function rekapSPL_(nomor, paksa) {
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     hari.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Owner': file.getUrl() }));
-    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, true);
+    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP OWNER DIPERBARUI' : 'PDF REKAP OWNER', own.map(o => o.email).join(','), file.getUrl());
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
+
+  // 3. rekap atasan langsung — hanya karyawan di bawah kewenangannya (dengan estimasi kompensasi)
+  const idOwner = own.map(o => o.id), atasanDari = r => cariAtasan_(r['Employee ID']);
+  const daftarAtasan = {};
+  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = atasanDari(r); if (a && idOwner.indexOf(a.id) < 0) daftarAtasan[a.id] = a; });
+  Object.values(daftarAtasan).forEach(a => {
+    const grp = hari.filter(r => { const x = atasanDari(r); return x && x.id === a.id; });
+    if (!grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
+    const lama = [...new Set(grp.map(r => r['Link PDF Atasan']).filter(Boolean))];
+    const pdf = buatPdfSPL_(grp, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Atasan ' + a.nama });
+    const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
+    lama.forEach(hapusPdfLama_);
+    grp.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Atasan': file.getUrl() }));
+    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + a.nama, true);
+    logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ATASAN DIPERBARUI' : 'PDF REKAP ATASAN', a.email, file.getUrl());
+    hasil.push('PDF rekap atasan dikirim ke ' + a.nama);
+  });
   return hasil.join('\n');
 }
 function tglFile_(r) { return Utilities.formatDate(r['Tanggal Lembur'], TZ, 'dd-MM-yyyy'); }
 
-function kirimRekap_(ke, rows, file, pdf, revisi, owner) {
+function kirimRekap_(ke, rows, file, pdf, revisi, label, owner) {
   const r0 = rows[0], ok = rows.filter(r => r['Status'] === ST.SETUJU);
   const tgl = r0['Hari'] + ', ' + tglIndo_(r0['Tanggal Lembur']);
   const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
   const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length;
-  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (owner ? ' — seluruh admin' : '') + '.</p>' +
+  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.toLowerCase()) : '') + '.</p>' +
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> karena ada Surat Perintah Lembur susulan di tanggal yang sama. ' +
       'Laporan sebelumnya sudah dihapus — gunakan PDF terbaru ini.</p>' : '') +
     '<p>' + nomor.length + ' surat (' + nomor.map(escH_).join(', ') + ')<br>' +
@@ -401,7 +418,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, owner) {
     (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
     (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
     '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
-  return kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (owner ? ' (Semua Admin)' : ''), isi, '', pdf);
+  return kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);
 }
 
 function folderPdf_(nama) {
