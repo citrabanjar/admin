@@ -13,6 +13,9 @@ on:
     paths: ['src/**', '.github/workflows/deploy-apps-script.yml']
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 concurrency:
   group: apps-script-deploy
   cancel-in-progress: false
@@ -55,3 +58,16 @@ jobs:
         env:
           DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
         run: clasp deploy --deploymentId "$DEPLOYMENT_ID" --description "GitHub ${GITHUB_SHA::7} — $(git log -1 --pretty=%s | cut -c1-60)"
+
+      - name: Tulis alamat form untuk GitHub Pages (docs/form-url.js)
+        env:
+          DEPLOYMENT_ID: ${{ secrets.DEPLOYMENT_ID }}
+        run: |
+          echo "window.FORM_URL = 'https://script.google.com/macros/s/${DEPLOYMENT_ID}/exec';" > docs/form-url.js
+          if [ -z "$(git status --porcelain docs/form-url.js)" ]; then echo "Alamat form tidak berubah"; exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/form-url.js
+          git commit -m "Perbarui alamat form Web App"
+          git pull --rebase origin main
+          git push origin HEAD:main

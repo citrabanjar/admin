@@ -17,10 +17,12 @@
 <body>
 <div id="muat"><div class="spin"></div><div>Memuat form SPL &amp; SPD…</div>
   <div id="alt" style="display:none">Belum muncul? <a id="langsung" href="#">Buka form langsung</a></div></div>
+<script src="form-url.js"></script>
 <script>
   // Form asli berjalan di Google Apps Script; halaman ini hanya "pintu masuk" dengan alamat pendek.
   // Parameter link email (?a=…&id=…&s=…) diteruskan apa adanya.
-  var APPS_SCRIPT = 'https://script.google.com/a/citrabanjar.com/macros/s/AKfycbxyUOucRU0IpoD4AuRFBjHkm83NJ80xJzwVQ8Aj66dr-dmkMAc/exec';
+  // Alamat Web App ditulis otomatis oleh GitHub Actions (docs/form-url.js) dari deployment yang selalu diperbarui.
+  var APPS_SCRIPT = window.FORM_URL || 'https://script.google.com/macros/s/AKfycbxyUOucRU0IpoD4AuRFBjHkm83NJ80xJzwVQ8Aj66dr-dmkMAc/exec';
   var tujuan = APPS_SCRIPT + location.search;
   document.getElementById('langsung').href = tujuan;
   var f = document.createElement('iframe');
