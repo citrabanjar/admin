@@ -312,7 +312,7 @@ function onOpen() {
     .addItem('2. Cek data karyawan', 'cekDataKaryawan')
     .addItem('3. Tes hitung lembur & SPD', 'tesHitung')
     .addSeparator()
-    .addItem('🔗 Link form SPL & SPD', 'bukaForm')
+    .addItem('🔗 Link form', 'bukaForm')
     .addSeparator()
     .addItem('✉ Kirim ulang email konfirmasi (SPL/SPD)', 'menuKirimUlangKonfirmasi')
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
@@ -503,7 +503,7 @@ function doGet(e) {
       .map(f => f.toString()).join('\n');
   t.logo = LOGO_DATA_URI;
   return t.evaluate()
-    .setTitle('SPL & SPD — ' + (param_().NAMA_PERUSAHAAN || ''))
+    .setTitle('Form — ' + (param_().NAMA_PERUSAHAAN || ''))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -514,9 +514,9 @@ function bukaForm() {
   const ui = SpreadsheetApp.getUi();
   if (!url) { ui.alert('Form belum di-deploy.\n\nDeploy → New deployment → Web app (lihat panduan).'); return; }
   ui.showModalDialog(HtmlService.createHtmlOutput(
-    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke user ADMIN):<br><br>' +
+    '<div style="font-family:Arial;font-size:13px">Link form (bagikan ke user ADMIN):<br><br>' +
     '<input style="width:100%;padding:6px" value="' + url + '" onclick="this.select()" readonly><br><br>' +
-    '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Form SPL & SPD');
+    '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Link Form');
 }
 
 /* ------------------------------ Login ------------------------------ */
@@ -587,7 +587,7 @@ function verifikasiKode(email, kode) {
   }
   c.remove('OTP_' + email); c.remove('G_' + email);
   const k = pembuatByEmail_(email);
-  logAksi_('-', '-', 'LOGIN', email, 'Login form SPL & SPD');
+  logAksi_('-', '-', 'LOGIN', email, 'Login form');
   return { token: sesiBuat_(email), user: infoUser_(k) };
 }
 
@@ -1131,7 +1131,7 @@ function halamanHtml_(isi) {
     '.instruksi a.kk span{color:#6C3AD6;font-weight:bold;font-size:14px;white-space:nowrap}' +
     '.msg{padding:12px;border-radius:8px;margin-top:14px}.ok{background:#E7F5EC;color:#1E7B4A}.err{background:#FDECEA;color:#B42318}.info{background:#EFF0F2}' +
     '</style></head><body><header><img src="' + LOGO_DATA_URI + '" alt="PT Citra Banjar Abadi"></header><main><div class="card">' + isi + '</div></main></body></html>';
-  return HtmlService.createHtmlOutput(html).setTitle('SPL & SPD — PT Citra Banjar Abadi')
+  return HtmlService.createHtmlOutput(html).setTitle('Form — PT Citra Banjar Abadi')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 

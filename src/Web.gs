@@ -22,7 +22,7 @@ function doGet(e) {
       .map(f => f.toString()).join('\n');
   t.logo = LOGO_DATA_URI;
   return t.evaluate()
-    .setTitle('SPL & SPD — ' + (param_().NAMA_PERUSAHAAN || ''))
+    .setTitle('Form — ' + (param_().NAMA_PERUSAHAAN || ''))
     .addMetaTag('viewport', 'width=device-width, initial-scale=1')
     .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
@@ -33,9 +33,9 @@ function bukaForm() {
   const ui = SpreadsheetApp.getUi();
   if (!url) { ui.alert('Form belum di-deploy.\n\nDeploy → New deployment → Web app (lihat panduan).'); return; }
   ui.showModalDialog(HtmlService.createHtmlOutput(
-    '<div style="font-family:Arial;font-size:13px">Link form SPL & SPD (bagikan ke user ADMIN):<br><br>' +
+    '<div style="font-family:Arial;font-size:13px">Link form (bagikan ke user ADMIN):<br><br>' +
     '<input style="width:100%;padding:6px" value="' + url + '" onclick="this.select()" readonly><br><br>' +
-    '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Form SPL & SPD');
+    '<a href="' + url + '" target="_blank">Buka form ↗</a></div>').setWidth(520).setHeight(170), 'Link Form');
 }
 
 /* ------------------------------ Login ------------------------------ */
@@ -106,7 +106,7 @@ function verifikasiKode(email, kode) {
   }
   c.remove('OTP_' + email); c.remove('G_' + email);
   const k = pembuatByEmail_(email);
-  logAksi_('-', '-', 'LOGIN', email, 'Login form SPL & SPD');
+  logAksi_('-', '-', 'LOGIN', email, 'Login form');
   return { token: sesiBuat_(email), user: infoUser_(k) };
 }
 

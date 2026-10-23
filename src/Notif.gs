@@ -229,7 +229,7 @@ function halamanHtml_(isi) {
     '.instruksi a.kk span{color:#6C3AD6;font-weight:bold;font-size:14px;white-space:nowrap}' +
     '.msg{padding:12px;border-radius:8px;margin-top:14px}.ok{background:#E7F5EC;color:#1E7B4A}.err{background:#FDECEA;color:#B42318}.info{background:#EFF0F2}' +
     '</style></head><body><header><img src="' + LOGO_DATA_URI + '" alt="PT Citra Banjar Abadi"></header><main><div class="card">' + isi + '</div></main></body></html>';
-  return HtmlService.createHtmlOutput(html).setTitle('SPL & SPD — PT Citra Banjar Abadi')
+  return HtmlService.createHtmlOutput(html).setTitle('Form — PT Citra Banjar Abadi')
     .addMetaTag('viewport', 'width=device-width, initial-scale=1').setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
 }
 
