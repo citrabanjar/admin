@@ -290,18 +290,24 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
 /** Nama atasan langsung (tanpa jabatan) — dipakai untuk "Diperintahkan oleh". Kosong bila atasan belum diisi. */
 function namaAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
+  if (k && isOwner_(k)) return k.nama;   // owner: atasannya diri sendiri
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.email && (k.atasan === 'BOSS' || k.peran === 'BOSS' || k.id === 'BOSS'));
+  return Object.values(karyawan_()).filter(k => k.aktif && k.email && isOwner_(k));
+}
+/** Peran OWNER (juga dikenali dari format lama: Atasan = BOSS) */
+function isOwner_(k) {
+  return !!k && (k.peran === 'OWNER' || k.peran === 'BOSS' || k.atasan === 'BOSS' || k.id === 'BOSS');
 }
 /** Atasan langsung dari kolom "Atasan" (Employee ID). */
 function cariAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
+  if (k && isOwner_(k)) return k.email && k.aktif ? k : null;   // owner: atasannya diri sendiri
   if (!k || !k.atasan) return null;
-  const a = K[k.atasan] || (k.atasan === 'BOSS' && !owner_().some(o => o.id === k.id) ? owner_()[0] : null);
+  const a = K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null);
   return a && a.email && a.aktif ? a : null;
 }
 

@@ -112,13 +112,16 @@ function cekDataKaryawan() {
 
   // Atasan langsung
   const Kmap = karyawan_();
-  const tanpaAtasan = aktif.filter(k => !k.atasan);
+  const owner = aktif.filter(isOwner_);
+  if (!owner.length) masalah.push({ j: '⚠ Belum ada OWNER', isi: ['Isi Peran = OWNER untuk pemilik (menerima rekap lembur semua admin).'] });
+  if (owner.some(o => !o.email)) masalah.push({ j: '❌ OWNER tanpa email (tidak menerima rekap)', isi: owner.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
+  const tanpaAtasan = aktif.filter(k => !k.atasan && !isOwner_(k));
   if (tanpaAtasan.length) masalah.push({ j: '⚠ Atasan belum diisi (' + tanpaAtasan.length + ' orang) — persetujuan lembur mereka dikirim ke admin', isi: tanpaAtasan.map(k => k.id + ' — ' + k.nama) });
-  const atasanSalah = aktif.filter(k => k.atasan && !Kmap[k.atasan]);
+  const atasanSalah = aktif.filter(k => k.atasan && !Kmap[k.atasan] && !(k.atasan === 'BOSS'));
   if (atasanSalah.length) masalah.push({ j: '❌ Employee ID atasan tidak ditemukan', isi: atasanSalah.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan) });
   const atasanTanpaEmail = aktif.filter(k => k.atasan && Kmap[k.atasan] && !Kmap[k.atasan].email);
   if (atasanTanpaEmail.length) masalah.push({ j: '⚠ Atasan belum punya email — persetujuan dikirim ke admin', isi: atasanTanpaEmail.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan + ' ' + Kmap[k.atasan].nama) });
-  const diriSendiri = aktif.filter(k => k.atasan && k.atasan === k.id);
+  const diriSendiri = aktif.filter(k => k.atasan && k.atasan === k.id && !isOwner_(k));   // owner boleh atasannya diri sendiri
   if (diriSendiri.length) masalah.push({ j: '❌ Atasan diisi diri sendiri', isi: diriSendiri.map(k => k.id + ' — ' + k.nama) });
 
   if (!P.EMAIL_ADMIN) masalah.push({ j: 'ℹ Parameter EMAIL_ADMIN kosong (opsional — salinan PDF SPL)', isi: ['Isi di sheet Parameter bila PDF SPL perlu dikirim juga ke email lain.'] });

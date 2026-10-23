@@ -42,7 +42,7 @@ function simpanSPD(token, d) {
 
     const personel = (d.personel || []).filter(p => p && teks(p.id)).map(p => Object.assign({}, p, { id: teks(p.id).toUpperCase() }));
     const biaya = (d.biaya || []).filter(b => b && (teks(b.jenis) || Number(b.jumlah)));
-    personel.forEach((p, i) => { if (!K[p.id] || !K[p.id].aktif) err.push('Personel ke-' + (i + 1) + ': Employee ID ' + p.id + ' tidak ditemukan / tidak aktif.'); });
+    personel.forEach((p, i) => { if (!K[p.id] || !K[p.id].aktif || isOwner_(K[p.id])) err.push('Personel ke-' + (i + 1) + ': Employee ID ' + p.id + ' tidak ditemukan / tidak aktif.'); });
     biaya.forEach((b, i) => {
       if (!teks(b.jenis)) err.push('Biaya ke-' + (i + 1) + ': jenis biaya wajib dipilih.');
       if (!(Number(b.jumlah) >= 0)) err.push('Biaya ke-' + (i + 1) + ': jumlah tidak valid.');

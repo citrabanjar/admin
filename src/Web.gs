@@ -123,7 +123,7 @@ function pilihan_() {
 function dataForm(token) {
   const u = sesiCek_(token);
   const P = param_(), pil = pilihan_();
-  const kar = Object.values(karyawan_()).filter(k => k.aktif)
+  const kar = Object.values(karyawan_()).filter(k => k.aktif && !isOwner_(k))   // owner tidak muncul di pencarian karyawan
     .map(k => ({ id: k.id, nama: k.nama, jabatan: k.jabatan, departemen: k.departemen }))   // TANPA gaji
     .sort((a, b) => (a.departemen + a.nama).localeCompare(b.departemen + b.nama));
   const jam = []; for (let h = 0; h <= 24; h++) jam.push(angkaKeJam_(h));

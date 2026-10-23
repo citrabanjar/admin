@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'ADMIN'];   // owner = karyawan dengan Atasan = BOSS (menerima rekap lembur semua admin)   // ADMIN = boleh login form & membuat surat
+const PERAN = ['KARYAWAN', 'ADMIN', 'OWNER'];   // OWNER = pemilik: atasannya diri sendiri, menerima rekap lembur semua admin, tidak bisa diberi surat   // ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */
@@ -394,13 +394,16 @@ function cekDataKaryawan() {
 
   // Atasan langsung
   const Kmap = karyawan_();
-  const tanpaAtasan = aktif.filter(k => !k.atasan);
+  const owner = aktif.filter(isOwner_);
+  if (!owner.length) masalah.push({ j: '⚠ Belum ada OWNER', isi: ['Isi Peran = OWNER untuk pemilik (menerima rekap lembur semua admin).'] });
+  if (owner.some(o => !o.email)) masalah.push({ j: '❌ OWNER tanpa email (tidak menerima rekap)', isi: owner.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
+  const tanpaAtasan = aktif.filter(k => !k.atasan && !isOwner_(k));
   if (tanpaAtasan.length) masalah.push({ j: '⚠ Atasan belum diisi (' + tanpaAtasan.length + ' orang) — persetujuan lembur mereka dikirim ke admin', isi: tanpaAtasan.map(k => k.id + ' — ' + k.nama) });
-  const atasanSalah = aktif.filter(k => k.atasan && !Kmap[k.atasan]);
+  const atasanSalah = aktif.filter(k => k.atasan && !Kmap[k.atasan] && !(k.atasan === 'BOSS'));
   if (atasanSalah.length) masalah.push({ j: '❌ Employee ID atasan tidak ditemukan', isi: atasanSalah.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan) });
   const atasanTanpaEmail = aktif.filter(k => k.atasan && Kmap[k.atasan] && !Kmap[k.atasan].email);
   if (atasanTanpaEmail.length) masalah.push({ j: '⚠ Atasan belum punya email — persetujuan dikirim ke admin', isi: atasanTanpaEmail.map(k => k.id + ' — ' + k.nama + ' → ' + k.atasan + ' ' + Kmap[k.atasan].nama) });
-  const diriSendiri = aktif.filter(k => k.atasan && k.atasan === k.id);
+  const diriSendiri = aktif.filter(k => k.atasan && k.atasan === k.id && !isOwner_(k));   // owner boleh atasannya diri sendiri
   if (diriSendiri.length) masalah.push({ j: '❌ Atasan diisi diri sendiri', isi: diriSendiri.map(k => k.id + ' — ' + k.nama) });
 
   if (!P.EMAIL_ADMIN) masalah.push({ j: 'ℹ Parameter EMAIL_ADMIN kosong (opsional — salinan PDF SPL)', isi: ['Isi di sheet Parameter bila PDF SPL perlu dikirim juga ke email lain.'] });
@@ -580,7 +583,7 @@ function pilihan_() {
 function dataForm(token) {
   const u = sesiCek_(token);
   const P = param_(), pil = pilihan_();
-  const kar = Object.values(karyawan_()).filter(k => k.aktif)
+  const kar = Object.values(karyawan_()).filter(k => k.aktif && !isOwner_(k))   // owner tidak muncul di pencarian karyawan
     .map(k => ({ id: k.id, nama: k.nama, jabatan: k.jabatan, departemen: k.departemen }))   // TANPA gaji
     .sort((a, b) => (a.departemen + a.nama).localeCompare(b.departemen + b.nama));
   const jam = []; for (let h = 0; h <= 24; h++) jam.push(angkaKeJam_(h));
@@ -671,6 +674,7 @@ function simpanSPL(token, data) {
       const id = String(b.id).trim().toUpperCase(), no = 'Baris ' + (i + 1) + ': ';
       const k = K[id];
       if (!k || !k.aktif) { err.push(no + 'Employee ID ' + id + ' tidak ditemukan / tidak aktif.'); return null; }
+      if (isOwner_(k)) { err.push(no + k.nama + ' adalah OWNER — tidak dapat diberi Surat Perintah Lembur.'); return null; }
       if (id === String(u.id).toUpperCase()) err.push(no + 'Anda tidak bisa memasukkan diri sendiri — Surat Perintah Lembur untuk Anda harus diinput oleh admin lain.');
       if (sudah[id]) err.push(no + k.nama + ' tercantum lebih dari sekali.');
       sudah[id] = true;
@@ -793,7 +797,7 @@ function simpanSPD(token, d) {
 
     const personel = (d.personel || []).filter(p => p && teks(p.id)).map(p => Object.assign({}, p, { id: teks(p.id).toUpperCase() }));
     const biaya = (d.biaya || []).filter(b => b && (teks(b.jenis) || Number(b.jumlah)));
-    personel.forEach((p, i) => { if (!K[p.id] || !K[p.id].aktif) err.push('Personel ke-' + (i + 1) + ': Employee ID ' + p.id + ' tidak ditemukan / tidak aktif.'); });
+    personel.forEach((p, i) => { if (!K[p.id] || !K[p.id].aktif || isOwner_(K[p.id])) err.push('Personel ke-' + (i + 1) + ': Employee ID ' + p.id + ' tidak ditemukan / tidak aktif.'); });
     biaya.forEach((b, i) => {
       if (!teks(b.jenis)) err.push('Biaya ke-' + (i + 1) + ': jenis biaya wajib dipilih.');
       if (!(Number(b.jumlah) >= 0)) err.push('Biaya ke-' + (i + 1) + ': jumlah tidak valid.');
@@ -1167,18 +1171,24 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
 /** Nama atasan langsung (tanpa jabatan) — dipakai untuk "Diperintahkan oleh". Kosong bila atasan belum diisi. */
 function namaAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
+  if (k && isOwner_(k)) return k.nama;   // owner: atasannya diri sendiri
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
-  return Object.values(karyawan_()).filter(k => k.aktif && k.email && (k.atasan === 'BOSS' || k.peran === 'BOSS' || k.id === 'BOSS'));
+  return Object.values(karyawan_()).filter(k => k.aktif && k.email && isOwner_(k));
+}
+/** Peran OWNER (juga dikenali dari format lama: Atasan = BOSS) */
+function isOwner_(k) {
+  return !!k && (k.peran === 'OWNER' || k.peran === 'BOSS' || k.atasan === 'BOSS' || k.id === 'BOSS');
 }
 /** Atasan langsung dari kolom "Atasan" (Employee ID). */
 function cariAtasan_(employeeId) {
   const K = karyawan_(), k = K[String(employeeId).toUpperCase()];
+  if (k && isOwner_(k)) return k.email && k.aktif ? k : null;   // owner: atasannya diri sendiri
   if (!k || !k.atasan) return null;
-  const a = K[k.atasan] || (k.atasan === 'BOSS' && !owner_().some(o => o.id === k.id) ? owner_()[0] : null);
+  const a = K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null);
   return a && a.email && a.aktif ? a : null;
 }
 
@@ -1636,7 +1646,7 @@ function apiData_(q) {
     if (q.api === 'laporan') return keluar(apiLaporan_(q));
     if (q.api === 'setuju') return keluar(apiSetuju_());
     if (q.api === 'tandai') return keluar(apiTandai_(q));
-    if (q.api === 'peran') return keluar({ ok: true, karyawan: Object.values(karyawan_()).filter(k => k.peran !== 'KARYAWAN' || k.atasan === 'BOSS' || k.id === 'BOSS')
+    if (q.api === 'peran') return keluar({ ok: true, karyawan: Object.values(karyawan_()).filter(k => k.peran !== 'KARYAWAN' || isOwner_(k))
       .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
     return keluar({ ok: false, error: 'api tidak dikenal' });
   } catch (e) { return keluar({ ok: false, error: String(e.message || e) }); }
