@@ -21,7 +21,7 @@ function cakupanBatal_(id) {
   if (m[1] === 'O' && !owner_().some(o => o.id === p.id)) throw new Error('Link pembatalan owner tidak berlaku lagi.');
   const S = bacaBaris_('SPL');
   const rows = S.rows.filter(r => r['Tanggal Lembur'] instanceof Date && ymd_(r['Tanggal Lembur']) === m[3] &&
-    (m[1] === 'O' || ((atasanRekap_(r['Employee ID']) || {}).id === p.id)));
+    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).some(a => a.id === p.id)));
   return { S: S, oleh: p, owner: m[1] === 'O', tgl: m[3], rows: rows, aktif: rows.filter(BISA_BATAL_) };
 }
 
@@ -99,7 +99,7 @@ function prosesBatal(id, sig, alasan) {
     '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p><p>Bila diperlukan, karyawan tersebut dapat diinput ulang melalui form pada tanggal yang sama. Riwayat pembatalan tetap tersimpan.</p>'));
   // 2b. tembusan ke atasan langsung karyawan (bila yang membatalkan bukan atasan itu sendiri)
   const perAtasan = {};
-  kena.forEach(r => [cariAtasan_(r['Employee ID']), atasanRekap_(r['Employee ID'])].forEach(a => {   // atasan langsung + atasan di atasnya
+  kena.forEach(r => rantaiAtasan_(r['Employee ID']).forEach(a => {   // semua atasan di rantai (tanpa owner)
     if (a && a.id !== C.oleh.id && !isOwner_(a)) (perAtasan[a.id] = perAtasan[a.id] || { a: a, rows: [] }).rows.push(r); }));
   Object.values(perAtasan).forEach(x => kirimEmail_(x.a.email, 'Tembusan: Lembur Dibatalkan oleh ' + C.oleh.nama + ' — ' + tgl,
     '<p>Yth. <b>' + escH_(x.a.nama) + '</b>,</p><p>Lembur karyawan di bawah Anda pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +

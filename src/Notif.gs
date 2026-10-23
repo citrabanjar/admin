@@ -294,13 +294,13 @@ function namaAtasan_(employeeId) {
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
-/** Penerima rekap & pembatalan: atasan DARI atasan langsung (mis. manager).
- *  Kosong bila atasan langsung / atasan di atasnya adalah owner (owner sudah menerima rekap semua). */
-function atasanRekap_(employeeId) {
-  const a = cariAtasan_(employeeId);
-  if (!a || isOwner_(a)) return null;
-  const b = cariAtasan_(a.id);
-  return b && b.id !== a.id && !isOwner_(b) ? b : null;
+/** Rantai atasan seorang karyawan (atasan langsung, atasannya, dst.) TANPA owner.
+ *  Setiap orang di rantai ini menerima rekap & tombol pembatalan untuk karyawan tsb. */
+function rantaiAtasan_(employeeId) {
+  const out = [], lihat = {};
+  let a = cariAtasan_(employeeId);
+  while (a && !isOwner_(a) && !lihat[a.id]) { lihat[a.id] = 1; out.push(a); a = cariAtasan_(a.id); }
+  return out;
 }
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
@@ -406,12 +406,12 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
 
-  // 3. rekap atasan dari atasan langsung (mis. manager) — hanya karyawan di bawah kewenangannya, dengan estimasi   // 3. rekap atasan langsung — hanya karyawan di bawah kewenangannya (dengan estimasi kompensasi) tombol batal
-  const idOwner = own.map(o => o.id), atasanDari = r => atasanRekap_(r['Employee ID']);
+  // 3. rekap tiap atasan (selain owner) — semua karyawan di bawah kewenangannya (langsung & tidak langsung), dengan estimasi & tombol batal
+  const rantai = r => rantaiAtasan_(r['Employee ID']);
   const daftarAtasan = {};
-  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = atasanDari(r); if (a && idOwner.indexOf(a.id) < 0) daftarAtasan[a.id] = a; });
+  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
   Object.values(daftarAtasan).forEach(a => {
-    const grp = hari.filter(r => { const x = atasanDari(r); return x && x.id === a.id; });
+    const grp = hari.filter(r => rantai(r).some(x => x.id === a.id));
     if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
     sudah['ats:' + a.id] = 1;
     const lama = [...new Set(grp.map(r => r['Link PDF Atasan']).filter(Boolean))];

@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'ADMIN', 'OWNER'];   // OWNER = pemilik: atasannya diri sendiri, menerima rekap lembur semua admin, tidak bisa diberi surat   // ADMIN = boleh login form & membuat surat
+const PERAN = ['KARYAWAN', 'ADMIN', 'OWNER'];   // OWNER = pemilik: atasannya diri sendiri, menerima rekap lembur semua admin, tidak bisa diberi surat; ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */
@@ -1175,13 +1175,13 @@ function namaAtasan_(employeeId) {
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
-/** Penerima rekap & pembatalan: atasan DARI atasan langsung (mis. manager).
- *  Kosong bila atasan langsung / atasan di atasnya adalah owner (owner sudah menerima rekap semua). */
-function atasanRekap_(employeeId) {
-  const a = cariAtasan_(employeeId);
-  if (!a || isOwner_(a)) return null;
-  const b = cariAtasan_(a.id);
-  return b && b.id !== a.id && !isOwner_(b) ? b : null;
+/** Rantai atasan seorang karyawan (atasan langsung, atasannya, dst.) TANPA owner.
+ *  Setiap orang di rantai ini menerima rekap & tombol pembatalan untuk karyawan tsb. */
+function rantaiAtasan_(employeeId) {
+  const out = [], lihat = {};
+  let a = cariAtasan_(employeeId);
+  while (a && !isOwner_(a) && !lihat[a.id]) { lihat[a.id] = 1; out.push(a); a = cariAtasan_(a.id); }
+  return out;
 }
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
@@ -1287,12 +1287,12 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
 
-  // 3. rekap atasan dari atasan langsung (mis. manager) — hanya karyawan di bawah kewenangannya, dengan estimasi   // 3. rekap atasan langsung — hanya karyawan di bawah kewenangannya (dengan estimasi kompensasi) tombol batal
-  const idOwner = own.map(o => o.id), atasanDari = r => atasanRekap_(r['Employee ID']);
+  // 3. rekap tiap atasan (selain owner) — semua karyawan di bawah kewenangannya (langsung & tidak langsung), dengan estimasi & tombol batal
+  const rantai = r => rantaiAtasan_(r['Employee ID']);
   const daftarAtasan = {};
-  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = atasanDari(r); if (a && idOwner.indexOf(a.id) < 0) daftarAtasan[a.id] = a; });
+  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
   Object.values(daftarAtasan).forEach(a => {
-    const grp = hari.filter(r => { const x = atasanDari(r); return x && x.id === a.id; });
+    const grp = hari.filter(r => rantai(r).some(x => x.id === a.id));
     if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
     sudah['ats:' + a.id] = 1;
     const lama = [...new Set(grp.map(r => r['Link PDF Atasan']).filter(Boolean))];
@@ -1521,7 +1521,7 @@ function cakupanBatal_(id) {
   if (m[1] === 'O' && !owner_().some(o => o.id === p.id)) throw new Error('Link pembatalan owner tidak berlaku lagi.');
   const S = bacaBaris_('SPL');
   const rows = S.rows.filter(r => r['Tanggal Lembur'] instanceof Date && ymd_(r['Tanggal Lembur']) === m[3] &&
-    (m[1] === 'O' || ((atasanRekap_(r['Employee ID']) || {}).id === p.id)));
+    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).some(a => a.id === p.id)));
   return { S: S, oleh: p, owner: m[1] === 'O', tgl: m[3], rows: rows, aktif: rows.filter(BISA_BATAL_) };
 }
 
@@ -1599,7 +1599,7 @@ function prosesBatal(id, sig, alasan) {
     '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p><p>Bila diperlukan, karyawan tersebut dapat diinput ulang melalui form pada tanggal yang sama. Riwayat pembatalan tetap tersimpan.</p>'));
   // 2b. tembusan ke atasan langsung karyawan (bila yang membatalkan bukan atasan itu sendiri)
   const perAtasan = {};
-  kena.forEach(r => [cariAtasan_(r['Employee ID']), atasanRekap_(r['Employee ID'])].forEach(a => {   // atasan langsung + atasan di atasnya
+  kena.forEach(r => rantaiAtasan_(r['Employee ID']).forEach(a => {   // semua atasan di rantai (tanpa owner)
     if (a && a.id !== C.oleh.id && !isOwner_(a)) (perAtasan[a.id] = perAtasan[a.id] || { a: a, rows: [] }).rows.push(r); }));
   Object.values(perAtasan).forEach(x => kirimEmail_(x.a.email, 'Tembusan: Lembur Dibatalkan oleh ' + C.oleh.nama + ' — ' + tgl,
     '<p>Yth. <b>' + escH_(x.a.nama) + '</b>,</p><p>Lembur karyawan di bawah Anda pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +
