@@ -891,7 +891,7 @@ function kartu(x) {
   const kelas = String(x.status).split(' ')[0];
   let info, det;
   if (x.jenis === 'SPL') {
-    info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang · ' + fmtJam(x.totalJam) + ' jam';
+    info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang';
     det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
       (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '') +
       (o.batalOleh ? '<div class="sub" style="margin-left:12px">Dibatalkan oleh <b>' + esc(o.batalOleh) + '</b>' + (o.alasanBatal ? ' — ' + esc(o.alasanBatal) : '') + '</div>' : '')).join('<br>') +
