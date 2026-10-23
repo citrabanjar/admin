@@ -294,6 +294,14 @@ function namaAtasan_(employeeId) {
   const a = k && k.atasan ? (K[k.atasan] || (k.atasan === 'BOSS' ? owner_()[0] : null)) : null;
   return a ? a.nama : '';
 }
+/** Penerima rekap & pembatalan: atasan DARI atasan langsung (mis. manager).
+ *  Kosong bila atasan langsung / atasan di atasnya adalah owner (owner sudah menerima rekap semua). */
+function atasanRekap_(employeeId) {
+  const a = cariAtasan_(employeeId);
+  if (!a || isOwner_(a)) return null;
+  const b = cariAtasan_(a.id);
+  return b && b.id !== a.id && !isOwner_(b) ? b : null;
+}
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
   return Object.values(karyawan_()).filter(k => k.aktif && k.email && isOwner_(k));
@@ -398,8 +406,8 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
 
-  // 3. rekap atasan langsung — hanya karyawan di bawah kewenangannya (dengan estimasi kompensasi)
-  const idOwner = own.map(o => o.id), atasanDari = r => cariAtasan_(r['Employee ID']);
+  // 3. rekap atasan dari atasan langsung (mis. manager) — hanya karyawan di bawah kewenangannya, dengan estimasi   // 3. rekap atasan langsung — hanya karyawan di bawah kewenangannya (dengan estimasi kompensasi) tombol batal
+  const idOwner = own.map(o => o.id), atasanDari = r => atasanRekap_(r['Employee ID']);
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = atasanDari(r); if (a && idOwner.indexOf(a.id) < 0) daftarAtasan[a.id] = a; });
   Object.values(daftarAtasan).forEach(a => {
