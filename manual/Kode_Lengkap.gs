@@ -1306,6 +1306,12 @@ function rekapSPL_(nomor, paksa, sudah) {
   });
   return hasil.join('\n');
 }
+/** "DISETUJUI 2 orang · DITOLAK 1 orang · ..." (hanya status yang ada) */
+function ringkasStatus_(rows) {
+  const n = st => rows.filter(r => r['Status'] === st).length, bagian = [['DISETUJUI', n(ST.SETUJU)], ['DITOLAK', n(ST.TOLAK)], ['DIBATALKAN', n(ST.BATAL)],
+    ['BELUM SELESAI', rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length]];
+  return bagian.filter((b, i) => i === 0 || b[1]).map(b => b[0] + ' ' + b[1] + ' orang').join(' · ');
+}
 function tglFile_(r) { return Utilities.formatDate(r['Tanggal Lembur'], TZ, 'dd-MM-yyyy'); }
 
 function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId) {
@@ -1317,7 +1323,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId) {
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> karena ada Surat Perintah Lembur susulan di tanggal yang sama. ' +
       'Laporan sebelumnya sudah dihapus — gunakan PDF terbaru ini.</p>' : '') +
     '<p>' + nomor.length + ' surat (' + nomor.map(escH_).join(', ') + ')<br>' +
-    ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> lembur, total ' + String(ok.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0)).replace('.', ',') + ' jam' +
+    escH_(ringkasStatus_(rows.filter(r => r['Status'] !== ST.TIDAK))) + (rows.some(r => r['Status'] === ST.TIDAK) ? ' · TIDAK BERSEDIA ' + rows.filter(r => r['Status'] === ST.TIDAK).length + ' orang' : '') +
     (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
     (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
     '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>' +
@@ -1363,7 +1369,6 @@ function buatPdfSPL_(rows, opt) {
   const tidak = rows.filter(r => r['Status'] === ST.TIDAK);
   const bersedia = rows.filter(r => r['Status'] !== ST.TIDAK);
   const setuju = bersedia.filter(r => r['Status'] === ST.SETUJU);
-  const totJam = setuju.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0);
   const totKomp = setuju.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0);
   const judulTabel = t => '<div style="font-weight:bold;font-size:11px;margin:12px 0 4px;color:#3A3A3A">' + t + '</div>';
   const tot = (lbl, span, isi, sisa) => '<tr><td colspan="' + span + '" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + lbl + '</td>' +
@@ -1393,8 +1398,8 @@ function buatPdfSPL_(rows, opt) {
         tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') +
         (opt.estimasi ? tdP_(rpH_([ST.TOLAK, ST.BATAL].indexOf(r['Status']) >= 0 ? 0 : r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') : '') +   // ditolak / dibatalkan = Rp 0
         tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(persetujuan(r)) + '</tr>').join('') +
-      tot('TOTAL LEMBUR DISETUJUI (' + setuju.length + ' dari ' + bersedia.length + ' karyawan)', headAwal.length + 3,
-        [[String(totJam).replace('.', ','), 'center']].concat(opt.estimasi ? [[rpH_(totKomp), 'right']] : []), 2) + '</table>';
+      (opt.estimasi ? tot(ringkasStatus_(bersedia), headAwal.length + 4, [[rpH_(totKomp), 'right']], 2)
+        : tot(ringkasStatus_(bersedia), headAwal.length + 6, [], 0)) + '</table>';
   } else {
     html += '<div style="font-size:9px;color:#777">Tidak ada karyawan yang bersedia lembur.</div>';
   }
