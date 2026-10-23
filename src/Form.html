@@ -243,7 +243,7 @@
           <div><label>Uang Saku / Orang</label><div class="chip" id="dSaku">–</div></div>
         </div>
         <div class="row" style="margin:12px 0 0">
-          <div style="max-width:260px"><label>Uang Kas dalam Perjalanan (Rp) *</label><input id="dKas" type="number" min="0" step="1000" placeholder="isi 0 bila tidak ada" oninput="hitungSPD()"><div class="sub" id="dKasF"></div></div>
+          <div style="max-width:260px"><label>Uang Kas dalam Perjalanan (Rp) *</label><input id="dKas" type="text" inputmode="numeric" autocomplete="off" placeholder="isi 0 bila tidak ada" oninput="fmtRp(this);hitungSPD()"></div>
           <div><label>&nbsp;</label><div class="sub" style="padding-top:6px">Uang saku dinas dibayarkan melalui aplikasi</div></div>
         </div>
       </div>
@@ -357,6 +357,9 @@ const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 const fmtJam = n => (Math.round(n * 100) / 100).toString().replace('.', ',');
 const rp = n => 'Rp ' + Math.round(Number(n) || 0).toLocaleString('id-ID');
+/* isian rupiah: tampil 1.000.000, nilai dibaca tanpa titik */
+const nilaiRp = inp => String(inp.value || '').replace(/\D/g, '');
+function fmtRp(inp) { const d = nilaiRp(inp).replace(/^0+(?=\d)/, ''); inp.value = d ? Number(d).toLocaleString('id-ID') : ''; }
 const tglPanjang = s => { const t = keTanggal_(s); return t ? t.toLocaleDateString('id-ID', { day: 'numeric', month: 'long', year: 'numeric' }) : ''; };
 const tglPendek = s => { const t = keTanggal_(s); return t ? t.toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) : ''; };
 const hariIni = () => { const d = new Date(); return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0'); };
@@ -655,7 +658,7 @@ function spdTambahBiaya() {
     '<td class="n"></td>' +
     '<td data-l="Jenis Biaya"><select class="j" onchange="hitungSPD()">' + opsi(D.pilihan.jenisBiaya, '', '— pilih —') + '</select><div class="rowerr"></div></td>' +
     '<td data-l="Uraian"><input class="ur" placeholder="mis. Hotel 2 malam"></td>' +
-    '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="number" min="0" step="1000" oninput="hitungSPD()"><div class="sub fmt"></div></td>' +
+    '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="text" inputmode="numeric" autocomplete="off" oninput="fmtRp(this);hitungSPD()"></td>' +
     '<td class="half" data-l="Bukti"><select class="bk">' + opsi(D.pilihan.bukti, '') + '</select></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="spdHapusBiaya(' + id + ')">✕</button></td>';
   $('bRows').appendChild(tr); BROWS.push({ id: id, el: tr }); hitungSPD();
@@ -693,9 +696,8 @@ function hitungSPD(tglBerubah) {
   });
   const biaya = [];
   BROWS.forEach((r, i) => {
-    const el = r.el, j = el.querySelector('.j').value, jm = el.querySelector('.jm').value;
+    const el = r.el, j = el.querySelector('.j').value, jm = nilaiRp(el.querySelector('.jm'));
     el.querySelector('.n').textContent = i + 1;
-    el.querySelector('.fmt').textContent = jm ? rp(jm) : '';
     const e = [];
     if ((j || jm) && !j) e.push('Pilih jenis biaya.');
     if (j && !(Number(jm) >= 0 && jm !== '')) e.push('Isi jumlah.');
@@ -716,9 +718,9 @@ function hitungSPD(tglBerubah) {
   else if (k < b) umum.push('Tanggal kembali lebih awal dari tanggal berangkat.');
   if (!$('dTrans').value) umum.push('Pilih transportasi.');
   if (!$('dSumber').value) umum.push('Pilih sumber biaya.');
-  const kas = $('dKas').value;
+  const kas = nilaiRp($('dKas'));
   if (kas === '' || !(Number(kas) >= 0)) umum.push('Isi uang kas dalam perjalanan (isi 0 bila tidak ada).');
-  $('dKasF').textContent = kas !== '' ? rp(kas) : ''; $('tKas').textContent = rp(Number(kas) || 0);
+  $('tKas').textContent = rp(Number(kas) || 0);
   if (!per.length) umum.push('Isi minimal 1 personel.');
   const warn = h.peringatan;
   SPD_OK = !adaErr && !umum.length;
@@ -731,9 +733,9 @@ function spdData() {
   return {
     tanggalSurat: $('dTglSurat').value, noReferensi: $('dRef').value, customer: $('dCustomer').value, dasarPenugasan: $('dDasar').value,
     maksud: $('dMaksud').value, tempat: $('dTempat').value, berangkat: $('dBrk').value, kembali: $('dKmb').value,
-    transportasi: $('dTrans').value, sumberBiaya: $('dSumber').value, uangKas: $('dKas').value === '' ? '' : Number($('dKas').value),
+    transportasi: $('dTrans').value, sumberBiaya: $('dSumber').value, uangKas: nilaiRp($('dKas')) === '' ? '' : Number(nilaiRp($('dKas'))),
     personel: PROWS.map(r => ({ id: r.el.querySelector('.k').value, lama: Number(r.el.querySelector('.lm').value), keterangan: r.el.querySelector('.ket').value })).filter(p => p.id),
-    biaya: BROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(r.el.querySelector('.jm').value) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
+    biaya: BROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(nilaiRp(r.el.querySelector('.jm'))) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
   };
 }
 function spdKonfirmasi() {
@@ -807,7 +809,7 @@ function ptjTambahBiaya(b) {
   tr.innerHTML = '<td class="n"></td>' +
     '<td data-l="Jenis Biaya"><select class="j" onchange="hitungPtj()">' + opsi(D.pilihan.jenisBiaya, b.jenis || '', '— pilih —') + '</select><div class="rowerr"></div></td>' +
     '<td data-l="Uraian"><input class="ur" value="' + esc(b.uraian || '') + '"></td>' +
-    '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="number" min="0" step="1000" value="' + (b.jumlah != null ? b.jumlah : '') + '" oninput="hitungPtj()"><div class="sub fmt"></div></td>' +
+    '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="text" inputmode="numeric" autocomplete="off" value="' + (b.jumlah != null && b.jumlah !== '' ? Number(b.jumlah).toLocaleString('id-ID') : '') + '" oninput="fmtRp(this);hitungPtj()"></td>' +
     '<td class="half" data-l="Bukti"><select class="bk">' + opsi(D.pilihan.bukti, b.bukti || '') + '</select></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="ptjHapusBiaya(' + id + ')">✕</button></td>';
   $('tBia').appendChild(tr); TBROWS.push({ id: id, el: tr }); hitungPtj();
@@ -832,9 +834,8 @@ function hitungPtj() {
   });
   let lain = 0;
   TBROWS.forEach((r, i) => {
-    const el = r.el, j = el.querySelector('.j').value, jm = el.querySelector('.jm').value, er = [];
+    const el = r.el, j = el.querySelector('.j').value, jm = nilaiRp(el.querySelector('.jm')), er = [];
     el.querySelector('.n').textContent = i + 1;
-    el.querySelector('.fmt').textContent = jm ? rp(jm) : '';
     if (jm && !j) er.push('Pilih jenis biaya.');
     if (j && jm === '') er.push('Isi jumlah.');
     el.querySelector('.rowerr').textContent = er.join(' ');
@@ -853,7 +854,7 @@ function ptjData() {
   return {
     nomor: PT.nomor, berangkat: $('tBrk').value, kembali: $('tKmb').value, ringkasan: $('tRingkas').value, pengesahan: $('tSah').checked,
     personel: [...document.querySelectorAll('#tPer tr[data-id]')].map(tr => ({ id: tr.dataset.id, lama: Number(tr.querySelector('.lm').value), keterangan: tr.querySelector('.ket').value })),
-    biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(r.el.querySelector('.jm').value) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
+    biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(nilaiRp(r.el.querySelector('.jm'))) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
   };
 }
 function ptjKonfirmasi() {
