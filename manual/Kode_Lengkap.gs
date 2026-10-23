@@ -1303,7 +1303,7 @@ function rekapSPL_(nomor, paksa, sudah) {
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     hari.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Owner': file.getUrl() }));
-    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true, 'O.' + own[0].id + '.' + tgl);
+    kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true, 'O.' + own[0].id + '.' + tgl, Object.assign({}, own[0], { semua: true }));
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP OWNER DIPERBARUI' : 'PDF REKAP OWNER', own.map(o => o.email).join(','), file.getUrl());
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
@@ -1341,10 +1341,10 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
   const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
   const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length;
   const nAda = st => rows.filter(r => r['Status'] === st).length;
-  const isi = atasan ? (   // rekap untuk atasan dari atasan langsung
+  const isi = atasan ? (   // rekap untuk atasan dari atasan langsung & owner (atasan.semua)
     '<p>Yth. <b>' + escH_(sdr_(atasan.nama)) + '</b>,</p>' +
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> — laporan sebelumnya sudah dihapus, gunakan PDF terbaru ini.</p>' : '') +
-    '<p>Terlampir kami sampaikan rekap Surat Perintah Lembur tanggal <b>' + escH_(tgl) + '</b> di bawah kelolaan ' + escH_(sdr_(atasan.nama)) + ' dengan rincian:</p>' +
+    '<p>Terlampir kami sampaikan rekap Surat Perintah Lembur tanggal <b>' + escH_(tgl) + '</b> ' + (atasan.semua ? 'untuk seluruh karyawan' : 'di bawah kelolaan ' + escH_(sdr_(atasan.nama))) + ' dengan rincian:</p>' +
     '<table style="font-size:14px;border-collapse:collapse">' +
     [['Total karyawan yang akan lembur', ok.length + ' orang'],
      ['Estimasi biaya lembur', rpH_(ok.reduce((t, r) => t + (Number(r['Estimasi Kompensasi']) || 0), 0))]].concat(
