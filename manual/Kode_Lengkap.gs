@@ -1346,7 +1346,8 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> — laporan sebelumnya sudah dihapus, gunakan PDF terbaru ini.</p>' : '') +
     '<p>Terlampir kami sampaikan rekap Surat Perintah Lembur tanggal <b>' + escH_(tgl) + '</b> di bawah kelolaan ' + escH_(sdr_(atasan.nama)) + ' dengan rincian:</p>' +
     '<table style="font-size:14px;border-collapse:collapse">' +
-    [['Total karyawan yang akan lembur', ok.length + ' orang']].concat(
+    [['Total karyawan yang akan lembur', ok.length + ' orang'],
+     ['Estimasi biaya lembur', rpH_(ok.reduce((t, r) => t + (Number(r['Estimasi Kompensasi']) || 0), 0))]].concat(
       nAda(ST.TOLAK) ? [['Ditolak atasan langsung', nAda(ST.TOLAK) + ' orang']] : [],
       nAda(ST.TIDAK) ? [['Tidak bersedia', nAda(ST.TIDAK) + ' orang']] : [],
       nAda(ST.BATAL) ? [['Dibatalkan', nAda(ST.BATAL) + ' orang']] : [],
