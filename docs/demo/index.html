@@ -734,7 +734,7 @@ function splKonfirmasi() {
   hitungSPL(); if (!SPL_OK) return;
   const d = splData(), t = keTanggal_(d.tanggal);
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Lembur</h3><p><b>' + NAMA_HARI[hariKe_(t) - 1] + ', ' + tglPanjang(d.tanggal) + '</b><br>' +
-    'Total karyawan yang akan lembur <b>' + d.baris.length + ' karyawan</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+    'Total karyawan yang akan lembur <b>' + d.baris.length + ' karyawan</b></p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="splKirim()">Ya, kirim</button></div>');
 }
 async function splKirim() {
@@ -870,7 +870,7 @@ function spdKonfirmasi() {
   if (!SPD_OK) { if (umum.length) pesan('dErr', 'err', umum.map(esc).join('<br>')); return; }
   const d = spdData();
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Dinas</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
-    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b><br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p><p class="sub">Setelah dikirim, surat masuk ke proses persetujuan dan tidak bisa diubah dari form.</p>' +
+    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b><br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="spdKirim()">Ya, kirim</button></div>');
 }
 async function spdKirim() {
