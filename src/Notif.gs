@@ -463,7 +463,9 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
     '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>' +
     (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
       tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '');
-  return kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);
+  const err = kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);
+  logAksi_('SPL', nomor.join(', '), err ? 'EMAIL REKAP GAGAL' : 'EMAIL REKAP TERKIRIM', ke, err || (label || 'Admin'));   // bukti email benar-benar dikirim
+  return err;
 }
 
 function folderPdf_(nama) {
