@@ -43,6 +43,11 @@ function apiData_(q) {
     if (q.api === 'laporan') return keluar(apiLaporan_(q));
     if (q.api === 'setuju') return keluar(apiSetuju_());
     if (q.api === 'tandai') return keluar(apiTandai_(q));
+    if (q.api === 'struktur') {   // struktur kolom Data Karyawan (tanpa gaji / email / data pribadi)
+      const sh = sheet_(SH.KARYAWAN), v = sh.getDataRange().getValues(), head = v.shift().map(String);
+      const pakai = head.map((h, i) => /atasan|peran|level|jabatan|position|posisi|grade|organi|depart|divisi|employee id|full name|status employee|nama/i.test(h) && !/salary|gaji|email|phone|telp|hp|nik|ktp|npwp|rek|bank|alamat|lahir|birth/i.test(h) ? i : -1).filter(i => i >= 0);
+      return keluar({ ok: true, kolom: head, baris: v.filter(r => String(r[0]).trim()).map(r => Object.fromEntries(pakai.map(i => [head[i], r[i] instanceof Date ? ymd_(r[i]) : r[i]]))) });
+    }
     if (q.api === 'peran') return keluar({ ok: true, karyawan: Object.values(karyawan_()).filter(k => k.peran !== 'KARYAWAN' || isOwner_(k))
       .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
     return keluar({ ok: false, error: 'api tidak dikenal' });
