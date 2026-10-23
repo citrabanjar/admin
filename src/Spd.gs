@@ -56,8 +56,8 @@ function simpanSPD(token, d) {
       const aktif = suratAktif_(d.berangkat, d.kembali);
       personel.forEach(p => {
         const k = K[p.id]; if (!k) return;
-        if (aktif.spd[p.id]) err.push(k.nama + ' sudah ditugaskan di ' + aktif.spd[p.id] + ' pada tanggal yang beririsan.');
-        if (aktif.spl[p.id]) warn.push(k.nama + ' punya SPL ' + aktif.spl[p.id] + ' di rentang dinas — SPL tersebut perlu ditinjau.');
+        if (aktif.spd[p.id]) err.push(sdr_(k.nama) + ' sudah ditugaskan di ' + aktif.spd[p.id] + ' pada tanggal yang beririsan.');
+        if (aktif.spl[p.id]) warn.push(sdr_(k.nama) + ' punya SPL ' + aktif.spl[p.id] + ' di rentang dinas — SPL tersebut perlu ditinjau.');
       });
     }
     if (err.length) return { ok: false, error: err };

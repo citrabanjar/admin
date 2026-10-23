@@ -280,3 +280,8 @@ function logAksi_(jenis, nomor, aksi, oleh, ket) {
 
 // agar bisa diuji di Node.js (diabaikan oleh Apps Script)
 if (typeof module !== 'undefined') module.exports = { hitungLembur_, hitungSPD_, formatNomor_, urutBerikutnya_, jamKeAngka_, angkaKeJam_, statusHari_ };
+
+/** "ANANG EFENDI" → "Sdr. Anang Efendi" (untuk pesan / notifikasi) */
+function sdr_(nama) {
+  return 'Sdr. ' + String(nama || '').toLowerCase().replace(/(^|[\s(.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).trim();
+}

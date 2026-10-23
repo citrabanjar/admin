@@ -280,6 +280,11 @@ function logAksi_(jenis, nomor, aksi, oleh, ket) {
 
 // agar bisa diuji di Node.js (diabaikan oleh Apps Script)
 if (typeof module !== 'undefined') module.exports = { hitungLembur_, hitungSPD_, formatNomor_, urutBerikutnya_, jamKeAngka_, angkaKeJam_, statusHari_ };
+
+/** "ANANG EFENDI" → "Sdr. Anang Efendi" (untuk pesan / notifikasi) */
+function sdr_(nama) {
+  return 'Sdr. ' + String(nama || '').toLowerCase().replace(/(^|[\s(.'-])([a-z])/g, (m, a, b) => a + b.toUpperCase()).trim();
+}
 /**
  * =====================================================================
  *  SISTEM SPL & SPD — File : Menu.gs   (TAHAP 1)
@@ -478,7 +483,7 @@ function doGet(e) {
   const t = HtmlService.createTemplateFromFile('Form');
   // rumus yang SAMA dengan server dipakai juga di browser (satu sumber rumus)
   t.rumusBersama = 'const NAMA_HARI = ' + JSON.stringify(NAMA_HARI) + ';\n' +
-    [ymd_, hariKe_, keTanggal_, jamKeAngka_, angkaKeJam_, rentang_, statusHari_, hitungLembur_, hitungSPD_]
+    [ymd_, hariKe_, keTanggal_, jamKeAngka_, angkaKeJam_, rentang_, statusHari_, hitungLembur_, hitungSPD_, sdr_]
       .map(f => f.toString()).join('\n');
   t.logo = LOGO_DATA_URI;
   return t.evaluate()
@@ -674,15 +679,15 @@ function simpanSPL(token, data) {
       const id = String(b.id).trim().toUpperCase(), no = 'Baris ' + (i + 1) + ': ';
       const k = K[id];
       if (!k || !k.aktif) { err.push(no + 'Employee ID ' + id + ' tidak ditemukan / tidak aktif.'); return null; }
-      if (isOwner_(k)) { err.push(no + k.nama + ' adalah OWNER — tidak dapat diberi Surat Perintah Lembur.'); return null; }
+      if (isOwner_(k)) { err.push(sdr_(k.nama) + ' adalah OWNER — tidak dapat diberi Surat Perintah Lembur.'); return null; }
       if (id === String(u.id).toUpperCase()) err.push(no + 'Anda tidak bisa memasukkan diri sendiri — Surat Perintah Lembur untuk Anda harus diinput oleh admin lain.');
-      if (sudah[id]) err.push(no + k.nama + ' tercantum lebih dari sekali.');
+      if (sudah[id]) err.push(sdr_(k.nama) + ' tercantum lebih dari sekali.');
       sudah[id] = true;
-      if (!String(b.uraian || '').trim()) err.push(no + 'Uraian pekerjaan ' + k.nama + ' wajib diisi.');
-      if (aktif.spl[id]) err.push(no + k.nama + ' sudah ada di SPL ' + aktif.spl[id] + '.');
-      if (aktif.spd[id]) err.push(no + k.nama + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
+      if (!String(b.uraian || '').trim()) err.push('Uraian pekerjaan ' + sdr_(k.nama) + ' wajib diisi.');
+      if (aktif.spl[id]) err.push(sdr_(k.nama) + ' sudah terdaftar di SPL ' + String(aktif.spl[id]).replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '') + '.');
+      if (aktif.spd[id]) err.push(sdr_(k.nama) + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
       const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
-      h.error.forEach(e => err.push(no + k.nama + ' — ' + e));
+      h.error.forEach(e => err.push(sdr_(k.nama) + ' — ' + e));
       return { k: k, b: b, h: h };
     });
     if (err.length) return { ok: false, error: err };
@@ -811,8 +816,8 @@ function simpanSPD(token, d) {
       const aktif = suratAktif_(d.berangkat, d.kembali);
       personel.forEach(p => {
         const k = K[p.id]; if (!k) return;
-        if (aktif.spd[p.id]) err.push(k.nama + ' sudah ditugaskan di ' + aktif.spd[p.id] + ' pada tanggal yang beririsan.');
-        if (aktif.spl[p.id]) warn.push(k.nama + ' punya SPL ' + aktif.spl[p.id] + ' di rentang dinas — SPL tersebut perlu ditinjau.');
+        if (aktif.spd[p.id]) err.push(sdr_(k.nama) + ' sudah ditugaskan di ' + aktif.spd[p.id] + ' pada tanggal yang beririsan.');
+        if (aktif.spl[p.id]) warn.push(sdr_(k.nama) + ' punya SPL ' + aktif.spl[p.id] + ' di rentang dinas — SPL tersebut perlu ditinjau.');
       });
     }
     if (err.length) return { ok: false, error: err };
@@ -1853,11 +1858,11 @@ function simpanPtjSPD(token, d) {
     const per = (d.personel || []).map(p => {
       const id = String(p.id).toUpperCase(), ref = disetujui[id], lama = Number(p.lama);
       if (!ref) { err.push('Personel ' + id + ' tidak termasuk personel yang disetujui.'); return null; }
-      if (!(lama >= 0 && lama === Math.floor(lama))) err.push(ref.nama + ': lama aktual tidak valid.');
-      else if (lama > lamaAktual) err.push(ref.nama + ': lama aktual melebihi lama dinas (' + lamaAktual + ' hari).');
+      if (!(lama >= 0 && lama === Math.floor(lama))) err.push(sdr_(ref.nama) + ': lama aktual tidak valid.');
+      else if (lama > lamaAktual) err.push(sdr_(ref.nama) + ': lama aktual melebihi lama dinas (' + lamaAktual + ' hari).');
       return { ref: ref, lama: lama, keterangan: String(p.keterangan || '').trim(), uangSaku: (lama || 0) * Number(P.UANG_SAKU_HARI) };
     }).filter(Boolean);
-    Object.keys(disetujui).forEach(id => { if (!per.some(p => p.ref.id === id)) err.push(disetujui[id].nama + ' belum diisi lama aktualnya.'); });
+    Object.keys(disetujui).forEach(id => { if (!per.some(p => p.ref.id === id)) err.push(sdr_(disetujui[id].nama) + ' belum diisi lama aktualnya.'); });
     const biaya = (d.biaya || []).filter(b => b && (String(b.jenis || '').trim() || Number(b.jumlah)));
     biaya.forEach((b, i) => {
       if (!String(b.jenis || '').trim()) err.push('Biaya ke-' + (i + 1) + ': jenis biaya wajib dipilih.');

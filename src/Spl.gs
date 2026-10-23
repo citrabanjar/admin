@@ -32,15 +32,15 @@ function simpanSPL(token, data) {
       const id = String(b.id).trim().toUpperCase(), no = 'Baris ' + (i + 1) + ': ';
       const k = K[id];
       if (!k || !k.aktif) { err.push(no + 'Employee ID ' + id + ' tidak ditemukan / tidak aktif.'); return null; }
-      if (isOwner_(k)) { err.push(no + k.nama + ' adalah OWNER — tidak dapat diberi Surat Perintah Lembur.'); return null; }
+      if (isOwner_(k)) { err.push(sdr_(k.nama) + ' adalah OWNER — tidak dapat diberi Surat Perintah Lembur.'); return null; }
       if (id === String(u.id).toUpperCase()) err.push(no + 'Anda tidak bisa memasukkan diri sendiri — Surat Perintah Lembur untuk Anda harus diinput oleh admin lain.');
-      if (sudah[id]) err.push(no + k.nama + ' tercantum lebih dari sekali.');
+      if (sudah[id]) err.push(sdr_(k.nama) + ' tercantum lebih dari sekali.');
       sudah[id] = true;
-      if (!String(b.uraian || '').trim()) err.push(no + 'Uraian pekerjaan ' + k.nama + ' wajib diisi.');
-      if (aktif.spl[id]) err.push(no + k.nama + ' sudah ada di SPL ' + aktif.spl[id] + '.');
-      if (aktif.spd[id]) err.push(no + k.nama + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
+      if (!String(b.uraian || '').trim()) err.push('Uraian pekerjaan ' + sdr_(k.nama) + ' wajib diisi.');
+      if (aktif.spl[id]) err.push(sdr_(k.nama) + ' sudah terdaftar di SPL ' + String(aktif.spl[id]).replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '') + '.');
+      if (aktif.spd[id]) err.push(sdr_(k.nama) + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
       const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
-      h.error.forEach(e => err.push(no + k.nama + ' — ' + e));
+      h.error.forEach(e => err.push(sdr_(k.nama) + ' — ' + e));
       return { k: k, b: b, h: h };
     });
     if (err.length) return { ok: false, error: err };

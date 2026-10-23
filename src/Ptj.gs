@@ -95,11 +95,11 @@ function simpanPtjSPD(token, d) {
     const per = (d.personel || []).map(p => {
       const id = String(p.id).toUpperCase(), ref = disetujui[id], lama = Number(p.lama);
       if (!ref) { err.push('Personel ' + id + ' tidak termasuk personel yang disetujui.'); return null; }
-      if (!(lama >= 0 && lama === Math.floor(lama))) err.push(ref.nama + ': lama aktual tidak valid.');
-      else if (lama > lamaAktual) err.push(ref.nama + ': lama aktual melebihi lama dinas (' + lamaAktual + ' hari).');
+      if (!(lama >= 0 && lama === Math.floor(lama))) err.push(sdr_(ref.nama) + ': lama aktual tidak valid.');
+      else if (lama > lamaAktual) err.push(sdr_(ref.nama) + ': lama aktual melebihi lama dinas (' + lamaAktual + ' hari).');
       return { ref: ref, lama: lama, keterangan: String(p.keterangan || '').trim(), uangSaku: (lama || 0) * Number(P.UANG_SAKU_HARI) };
     }).filter(Boolean);
-    Object.keys(disetujui).forEach(id => { if (!per.some(p => p.ref.id === id)) err.push(disetujui[id].nama + ' belum diisi lama aktualnya.'); });
+    Object.keys(disetujui).forEach(id => { if (!per.some(p => p.ref.id === id)) err.push(sdr_(disetujui[id].nama) + ' belum diisi lama aktualnya.'); });
     const biaya = (d.biaya || []).filter(b => b && (String(b.jenis || '').trim() || Number(b.jumlah)));
     biaya.forEach((b, i) => {
       if (!String(b.jenis || '').trim()) err.push('Biaya ke-' + (i + 1) + ': jenis biaya wajib dipilih.');

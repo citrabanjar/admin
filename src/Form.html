@@ -588,7 +588,7 @@ function hitungSPL() {
     if (okh) tot += h.jamEfektif;
     el.querySelector('.rowerr').textContent = e.join(' ');
     el.querySelector('.rowwarn').textContent = w.length ? '⚠ ' + w.join(' ') : '';
-    if (w.length && k) warnUU.push(k.nama);
+    if (w.length && k) warnUU.push(sdr_(k.nama));
     if (e.length) adaErr = true;
   });
   $('lOrang').textContent = orang;

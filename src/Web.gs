@@ -18,7 +18,7 @@ function doGet(e) {
   const t = HtmlService.createTemplateFromFile('Form');
   // rumus yang SAMA dengan server dipakai juga di browser (satu sumber rumus)
   t.rumusBersama = 'const NAMA_HARI = ' + JSON.stringify(NAMA_HARI) + ';\n' +
-    [ymd_, hariKe_, keTanggal_, jamKeAngka_, angkaKeJam_, rentang_, statusHari_, hitungLembur_, hitungSPD_]
+    [ymd_, hariKe_, keTanggal_, jamKeAngka_, angkaKeJam_, rentang_, statusHari_, hitungLembur_, hitungSPD_, sdr_]
       .map(f => f.toString()).join('\n');
   t.logo = LOGO_DATA_URI;
   return t.evaluate()
