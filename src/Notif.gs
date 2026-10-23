@@ -510,7 +510,7 @@ function buatPdfSPL_(rows, opt) {
       bersedia.map((r, i) => '<tr>' + selAwal(r, i) +
         tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
         tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') +
-        (opt.estimasi ? tdP_(rpH_(r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') : '') +
+        (opt.estimasi ? tdP_(rpH_([ST.TOLAK, ST.BATAL].indexOf(r['Status']) >= 0 ? 0 : r['Estimasi Kompensasi']), 'text-align:right;white-space:nowrap') : '') +   // ditolak / dibatalkan = Rp 0
         tdP_(escH_(r['Uraian Pekerjaan'])) + tdP_(persetujuan(r)) + '</tr>').join('') +
       tot('TOTAL LEMBUR DISETUJUI (' + setuju.length + ' dari ' + bersedia.length + ' karyawan)', headAwal.length + 3,
         [[String(totJam).replace('.', ','), 'center']].concat(opt.estimasi ? [[rpH_(totKomp), 'right']] : []), 2) + '</table>';
