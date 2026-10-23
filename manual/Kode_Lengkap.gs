@@ -1489,6 +1489,7 @@ function menuKirimUlangKonfirmasi() {
  *  Setelah dibatalkan:
  *   1. email ke tiap karyawan terdampak: dibatalkan oleh siapa + alasan
  *   2. email ke admin pembuat surat (boleh input ulang di tanggal yang sama)
+ *      + tembusan ke atasan langsung karyawan (bila dibatalkan oleh owner)
  *   3. rekap PDF admin / atasan / owner dibuat ulang (riwayat & alasan tetap tercatat)
  * =====================================================================
  */
@@ -1578,6 +1579,13 @@ function prosesBatal(id, sig, alasan) {
     '<p>Lembur berikut pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +
     perAdmin[em].map(r => '<li><b>' + escH_(r['Full Name']) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' (' + escH_(r['Nomor SPL']) + ')</li>').join('') +
     '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p><p>Bila diperlukan, karyawan tersebut dapat diinput ulang melalui form pada tanggal yang sama. Riwayat pembatalan tetap tersimpan.</p>'));
+  // 2b. tembusan ke atasan langsung karyawan (bila yang membatalkan bukan atasan itu sendiri)
+  const perAtasan = {};
+  kena.forEach(r => { const a = cariAtasan_(r['Employee ID']); if (a && a.id !== C.oleh.id) (perAtasan[a.id] = perAtasan[a.id] || { a: a, rows: [] }).rows.push(r); });
+  Object.values(perAtasan).forEach(x => kirimEmail_(x.a.email, 'Tembusan: Lembur Dibatalkan oleh ' + C.oleh.nama + ' — ' + tgl,
+    '<p>Yth. <b>' + escH_(x.a.nama) + '</b>,</p><p>Lembur karyawan di bawah Anda pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +
+    x.rows.map(r => '<li><b>' + escH_(r['Full Name']) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' — ' + escH_(r['Uraian Pekerjaan']) + '</li>').join('') +
+    '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p>'));
   // 3. rekap PDF dibuat ulang
   const sudah = {};
   [...new Set(kena.map(r => r['Nomor SPL']))].forEach(n => { try { rekapSPL_(n, true, sudah); } catch (e) { logAksi_('SPL', n, 'PDF GAGAL', '', String(e)); } });
