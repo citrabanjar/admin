@@ -43,6 +43,8 @@ function apiData_(q) {
     if (q.api === 'laporan') return keluar(apiLaporan_(q));
     if (q.api === 'setuju') return keluar(apiSetuju_());
     if (q.api === 'tandai') return keluar(apiTandai_(q));
+    if (q.api === 'antrian') { const P = PropertiesService.getScriptProperties(), d = Number(P.getProperty(ANTRIAN_DETAK) || 0);
+      return keluar({ ok: true, aktif: antrianAktif_(), detakTerakhir: d ? Utilities.formatDate(new Date(d), TZ, 'dd/MM/yyyy HH:mm:ss') : '-', antrian: JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]').length }); }
     if (q.api === 'struktur') {   // struktur kolom Data Karyawan (tanpa gaji / email / data pribadi)
       const sh = sheet_(SH.KARYAWAN), v = sh.getDataRange().getValues(), head = v.shift().map(String);
       const pakai = head.map((h, i) => /atasan|peran|level|jabatan|position|posisi|grade|organi|depart|divisi|employee id|full name|status employee|nama/i.test(h) && !/salary|gaji|email|phone|telp|hp|nik|ktp|npwp|rek|bank|alamat|lahir|birth/i.test(h) ? i : -1).filter(i => i >= 0);
