@@ -419,7 +419,7 @@ function rekapSPL_(nomor, paksa, sudah) {
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     grp.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Atasan': file.getUrl() }));
-    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + sdr_(a.nama), true, 'A.' + a.id + '.' + tgl);
+    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + sdr_(a.nama), true, 'A.' + a.id + '.' + tgl, a);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ATASAN DIPERBARUI' : 'PDF REKAP ATASAN', a.email, file.getUrl());
     hasil.push('PDF rekap atasan dikirim ke ' + a.nama);
   });
@@ -433,12 +433,26 @@ function ringkasStatus_(rows) {
 }
 function tglFile_(r) { return Utilities.formatDate(r['Tanggal Lembur'], TZ, 'dd-MM-yyyy'); }
 
-function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId) {
+function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan) {
   const r0 = rows[0], ok = rows.filter(r => r['Status'] === ST.SETUJU);
   const tgl = r0['Hari'] + ', ' + tglIndo_(r0['Tanggal Lembur']);
   const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
   const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length;
-  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.charAt(0).toLowerCase() + label.slice(1)) : '') + '.</p>' +
+  const nAda = st => rows.filter(r => r['Status'] === st).length;
+  const isi = atasan ? (   // rekap untuk atasan dari atasan langsung
+    '<p>Yth. <b>' + escH_(sdr_(atasan.nama)) + '</b>,</p>' +
+    (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> — laporan sebelumnya sudah dihapus, gunakan PDF terbaru ini.</p>' : '') +
+    '<p>Terlampir kami sampaikan rekap Surat Perintah Lembur tanggal <b>' + escH_(tgl) + '</b> di bawah kelolaan ' + escH_(sdr_(atasan.nama)) + ' dengan rincian:</p>' +
+    '<table style="font-size:14px;border-collapse:collapse">' +
+    [['Total karyawan yang akan lembur', ok.length + ' orang']].concat(
+      nAda(ST.TOLAK) ? [['Ditolak atasan langsung', nAda(ST.TOLAK) + ' orang']] : [],
+      nAda(ST.TIDAK) ? [['Tidak bersedia', nAda(ST.TIDAK) + ' orang']] : [],
+      nAda(ST.BATAL) ? [['Dibatalkan', nAda(ST.BATAL) + ' orang']] : [],
+      belum ? [['Belum selesai diproses', belum + ' orang']] : [])
+      .map(x => '<tr><td style="padding:3px 12px 3px 0">' + x[0] + '</td><td style="padding:3px 0">: <b>' + x[1] + '</b></td></tr>').join('') + '</table>' +
+    (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
+      tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '')
+  ) : '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.charAt(0).toLowerCase() + label.slice(1)) : '') + '.</p>' +
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> karena ada Surat Perintah Lembur susulan di tanggal yang sama. ' +
       'Laporan sebelumnya sudah dihapus — gunakan PDF terbaru ini.</p>' : '') +
     '<p>' + nomor.length + ' surat (' + nomor.map(escH_).join(', ') + ')<br>' +
