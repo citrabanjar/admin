@@ -21,7 +21,7 @@ function cakupanBatal_(id) {
   if (m[1] === 'O' && !owner_().some(o => o.id === p.id)) throw new Error('Link pembatalan owner tidak berlaku lagi.');
   const S = bacaBaris_('SPL');
   const rows = S.rows.filter(r => r['Tanggal Lembur'] instanceof Date && ymd_(r['Tanggal Lembur']) === m[3] &&
-    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).some(a => a.id === p.id)));
+    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).slice(1).some(a => a.id === p.id)));
   return { S: S, oleh: p, owner: m[1] === 'O', tgl: m[3], rows: rows, aktif: rows.filter(BISA_BATAL_) };
 }
 

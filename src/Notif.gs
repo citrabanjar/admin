@@ -406,8 +406,8 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
 
-  // 3. rekap tiap atasan (selain owner) — semua karyawan di bawah kewenangannya (langsung & tidak langsung), dengan estimasi & tombol batal
-  const rantai = r => rantaiAtasan_(r['Employee ID']);
+  // 3. rekap atasan di atas atasan langsung (selain owner) — karyawan di bawah kewenangannya, dengan estimasi & tombol batal
+  const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
   Object.values(daftarAtasan).forEach(a => {

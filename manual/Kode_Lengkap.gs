@@ -1287,8 +1287,8 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
   }
 
-  // 3. rekap tiap atasan (selain owner) — semua karyawan di bawah kewenangannya (langsung & tidak langsung), dengan estimasi & tombol batal
-  const rantai = r => rantaiAtasan_(r['Employee ID']);
+  // 3. rekap atasan di atas atasan langsung (selain owner) — karyawan di bawah kewenangannya, dengan estimasi & tombol batal
+  const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
   Object.values(daftarAtasan).forEach(a => {
@@ -1521,7 +1521,7 @@ function cakupanBatal_(id) {
   if (m[1] === 'O' && !owner_().some(o => o.id === p.id)) throw new Error('Link pembatalan owner tidak berlaku lagi.');
   const S = bacaBaris_('SPL');
   const rows = S.rows.filter(r => r['Tanggal Lembur'] instanceof Date && ymd_(r['Tanggal Lembur']) === m[3] &&
-    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).some(a => a.id === p.id)));
+    (m[1] === 'O' || rantaiAtasan_(r['Employee ID']).slice(1).some(a => a.id === p.id)));
   return { S: S, oleh: p, owner: m[1] === 'O', tgl: m[3], rows: rows, aktif: rows.filter(BISA_BATAL_) };
 }
 
