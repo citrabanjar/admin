@@ -756,7 +756,7 @@ async function spdKirim() {
 
 function sukses(jenis, nomor, ringkas, status, warn) {
   modal('<h3 style="margin-top:0;color:var(--ok)">✅ ' + NAMA_JENIS[jenis] + ' tersimpan</h3>' +
-    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) sudah dikirim ke tiap ' + (jenis === 'SPL' ? 'karyawan' : 'personel') + '.</p>' +
+    '<p>Nomor: <b style="font-size:16px">' + esc(nomor) + '</b><br>' + esc(ringkas) + '<br>Status: <span class="st MENUNGGU">' + esc(status) + '</span></p>' + '<p class="sub">Email konfirmasi (Bersedia / Tidak Bersedia) dikirim ke tiap ' + (jenis === 'SPL' ? 'karyawan' : 'personel') + ' dalam ±1 menit.</p>' +
     (warn.length ? '<div class="msg warn">⚠ ' + warn.map(esc).join('<br>⚠ ') + '</div>' : '') +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal();buka(\'riwayat\')">Lihat riwayat</button>' +
     '<button class="btn" onclick="tutupModal();buka(\'home\')">Selesai</button></div>');

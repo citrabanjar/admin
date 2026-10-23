@@ -82,8 +82,11 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
+const CACHE_KARYAWAN = 'KARYAWAN_V1';
+function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
+  try { const c = CacheService.getScriptCache().get(CACHE_KARYAWAN); if (c) return (_K = JSON.parse(c)); } catch (e) {}
   _K = {};
   bacaTabel_(SH.KARYAWAN, 'Employee ID').forEach(r => {
     const id = String(r['Employee ID']).trim().toUpperCase();
@@ -103,6 +106,8 @@ function karyawan_() {
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
+  // disimpan sementara 5 menit agar tiap klik tidak membaca ulang sheet (dihapus otomatis saat sheet karyawan diedit)
+  try { CacheService.getScriptCache().put(CACHE_KARYAWAN, JSON.stringify(_K), 300); } catch (e) {}
   return _K;
 }
 function cariKaryawanByEmail_(email) {
@@ -293,6 +298,14 @@ function sdr_(nama) {
  * =====================================================================
  */
 
+/** Simple trigger: edit di sheet karyawan → hapus cache data karyawan */
+function onEdit(e) {
+  try {
+    const n = e && e.range ? e.range.getSheet().getName() : '';
+    if ([SH.KARYAWAN].concat(SH_ALTERNATIF[SH.KARYAWAN] || []).indexOf(n) >= 0) CacheService.getScriptCache().remove(CACHE_KARYAWAN);
+  } catch (err) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('⚙️ SPL / SPD')
     .addItem('1. Setup awal (jalankan sekali)', 'setupAwal')
@@ -310,6 +323,7 @@ function onOpen() {
 
 /** Setup awal: zona waktu, simpan ID file, kunci sheet sistem, format kolom jam. */
 function setupAwal() {
+  hapusCacheKaryawan_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.setSpreadsheetTimeZone(TZ);
   PropertiesService.getScriptProperties().setProperty('SS_ID', ss.getId());
@@ -368,6 +382,7 @@ function setupAwal() {
 
 /** Periksa kelengkapan master karyawan sebelum notifikasi email diaktifkan. */
 function cekDataKaryawan() {
+  hapusCacheKaryawan_();
   _K = null; _P = null;
   const K = Object.values(karyawan_());
   const P = param_();
@@ -719,7 +734,7 @@ function simpanSPL(token, data) {
     lock.releaseLock();
   }
   // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
-  try { kirimKonfirmasiSPL_(hasilSimpan.nomor); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  try { antri_({ t: 'konfirmasi', jenis: 'SPL', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 
@@ -859,7 +874,7 @@ function simpanSPD(token, d) {
   } finally {
     lock.releaseLock();
   }
-  try { kirimKonfirmasi_('SPD', hasilSimpan.nomor); } catch (e) { logAksi_('SPD', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  try { antri_({ t: 'konfirmasi', jenis: 'SPD', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPD', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 
@@ -1170,7 +1185,7 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
     }
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
-  try { cekSelesai_(jenis, nomor); } catch (e) { logAksi_(jenis, nomor, 'PDF GAGAL', '', String(e)); }
+  try { antri_({ t: 'selesai', jenis: jenis, nomor: nomor }); } catch (e) { logAksi_(jenis, nomor, 'PDF GAGAL', '', String(e)); }
   return pesan;
 }
 
@@ -1591,7 +1606,19 @@ function prosesBatal(id, sig, alasan) {
     SpreadsheetApp.flush();
     logAksi_('SPL', [...new Set(kena.map(r => r['Nomor SPL']))].join(', '), 'DIBATALKAN', C.oleh.email, kena.length + ' karyawan, tgl ' + C.tgl + ' — ' + alasan);
   } finally { lock.releaseLock(); }
+  const tglTeks = kena[0]['Hari'] + ', ' + tglIndo_(kena[0]['Tanggal Lembur']);
+  try { antri_({ t: 'batal', id: id, alasan: alasan, ids: kena.map(r => String(r['ID Baris'])) }); }
+  catch (e) { logAksi_('SPL', id, 'EMAIL BATAL GAGAL', '', String(e)); }
+  return 'Lembur ' + kena.length + ' karyawan pada ' + escH_(tglTeks) + ' telah <b>DIBATALKAN</b>. Karyawan dan admin akan diberi tahu melalui email.';
+}
 
+/** Lanjutan pembatalan (email + rekap baru) — dijalankan dari antrian. */
+function batalLanjutan_(t) {
+  const alasan = t.alasan, m = String(t.id).match(/^([AO])\.([^.]+)\./);
+  const C = { oleh: karyawan_()[m[2].toUpperCase()] || { id: m[2], nama: m[2] } };
+  const set = {}; t.ids.forEach(i => set[i] = 1);
+  const kena = bacaBaris_('SPL').rows.filter(r => set[String(r['ID Baris'])]);
+  if (!kena.length) return;
   const K = karyawan_(), tgl = kena[0]['Hari'] + ', ' + tglIndo_(kena[0]['Tanggal Lembur']);
   // 1. email ke karyawan terdampak
   kena.forEach(r => {
@@ -1620,7 +1647,62 @@ function prosesBatal(id, sig, alasan) {
   // 3. rekap PDF dibuat ulang
   const sudah = {};
   [...new Set(kena.map(r => r['Nomor SPL']))].forEach(n => { try { rekapSPL_(n, true, sudah); } catch (e) { logAksi_('SPL', n, 'PDF GAGAL', '', String(e)); } });
-  return 'Lembur ' + kena.length + ' karyawan pada ' + escH_(tgl) + ' telah <b>DIBATALKAN</b>. Karyawan dan admin sudah diberi tahu melalui email.';
+}
+/**
+ * =====================================================================
+ *  SISTEM SPL & SPD — File : Antrian.gs
+ *  Pekerjaan berat (kirim email konfirmasi, buat PDF rekap, email pembatalan)
+ *  dikerjakan di LATAR BELAKANG agar tombol di form / email langsung selesai.
+ *
+ *  Butuh 1 pemicu (trigger) waktu: fungsi prosesAntrian, setiap 1 menit
+ *  (dibuat sekali dari editor Apps Script → Pemicu). Selama pemicu belum
+ *  aktif, pekerjaan tetap dijalankan langsung seperti sebelumnya.
+ * =====================================================================
+ */
+const ANTRIAN_KEY = 'Q', ANTRIAN_DETAK = 'Q_DETAK';
+
+/** Pemicu aktif bila prosesAntrian berjalan dalam 3 menit terakhir */
+function antrianAktif_() {
+  return Date.now() - Number(PropertiesService.getScriptProperties().getProperty(ANTRIAN_DETAK) || 0) < 3 * 60 * 1000;
+}
+
+/** Masukkan tugas ke antrian (atau jalankan langsung bila pemicu belum aktif). */
+function antri_(tugas) {
+  if (!antrianAktif_()) return jalankanTugas_(tugas);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(15000)) return jalankanTugas_(tugas);
+  try {
+    const P = PropertiesService.getScriptProperties();
+    const q = JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]');
+    const kunci = JSON.stringify(tugas);
+    if (!q.some(t => JSON.stringify(t) === kunci)) q.push(tugas);
+    P.setProperty(ANTRIAN_KEY, JSON.stringify(q));
+  } finally { lock.releaseLock(); }
+}
+
+/** Dipanggil pemicu waktu setiap 1 menit. */
+function prosesAntrian() {
+  const P = PropertiesService.getScriptProperties();
+  P.setProperty(ANTRIAN_DETAK, String(Date.now()));
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return;
+  let q;
+  try {
+    q = JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]');
+    if (!q.length) return;
+    P.setProperty(ANTRIAN_KEY, '[]');
+  } finally { lock.releaseLock(); }
+  q.forEach(t => {
+    try { _K = null; _P = null; jalankanTugas_(t); }
+    catch (e) { logAksi_(t.jenis || 'SPL', t.nomor || t.id || '-', 'ANTRIAN GAGAL', '', t.t + ': ' + String(e)); }
+  });
+}
+
+function jalankanTugas_(t) {
+  if (t.t === 'konfirmasi') return kirimKonfirmasi_(t.jenis, t.nomor);
+  if (t.t === 'selesai') return cekSelesai_(t.jenis, t.nomor);
+  if (t.t === 'batal') return batalLanjutan_(t);
+  throw new Error('Tugas tidak dikenal: ' + t.t);
 }
 /**
  * =====================================================================

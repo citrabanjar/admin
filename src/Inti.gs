@@ -82,8 +82,11 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
+const CACHE_KARYAWAN = 'KARYAWAN_V1';
+function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
+  try { const c = CacheService.getScriptCache().get(CACHE_KARYAWAN); if (c) return (_K = JSON.parse(c)); } catch (e) {}
   _K = {};
   bacaTabel_(SH.KARYAWAN, 'Employee ID').forEach(r => {
     const id = String(r['Employee ID']).trim().toUpperCase();
@@ -103,6 +106,8 @@ function karyawan_() {
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
+  // disimpan sementara 5 menit agar tiap klik tidak membaca ulang sheet (dihapus otomatis saat sheet karyawan diedit)
+  try { CacheService.getScriptCache().put(CACHE_KARYAWAN, JSON.stringify(_K), 300); } catch (e) {}
   return _K;
 }
 function cariKaryawanByEmail_(email) {

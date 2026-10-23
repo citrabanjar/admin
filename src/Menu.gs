@@ -5,6 +5,14 @@
  * =====================================================================
  */
 
+/** Simple trigger: edit di sheet karyawan → hapus cache data karyawan */
+function onEdit(e) {
+  try {
+    const n = e && e.range ? e.range.getSheet().getName() : '';
+    if ([SH.KARYAWAN].concat(SH_ALTERNATIF[SH.KARYAWAN] || []).indexOf(n) >= 0) CacheService.getScriptCache().remove(CACHE_KARYAWAN);
+  } catch (err) {}
+}
+
 function onOpen() {
   SpreadsheetApp.getUi().createMenu('⚙️ SPL / SPD')
     .addItem('1. Setup awal (jalankan sekali)', 'setupAwal')
@@ -22,6 +30,7 @@ function onOpen() {
 
 /** Setup awal: zona waktu, simpan ID file, kunci sheet sistem, format kolom jam. */
 function setupAwal() {
+  hapusCacheKaryawan_();
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   ss.setSpreadsheetTimeZone(TZ);
   PropertiesService.getScriptProperties().setProperty('SS_ID', ss.getId());
@@ -80,6 +89,7 @@ function setupAwal() {
 
 /** Periksa kelengkapan master karyawan sebelum notifikasi email diaktifkan. */
 function cekDataKaryawan() {
+  hapusCacheKaryawan_();
   _K = null; _P = null;
   const K = Object.values(karyawan_());
   const P = param_();

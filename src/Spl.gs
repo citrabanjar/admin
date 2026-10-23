@@ -71,7 +71,7 @@ function simpanSPL(token, data) {
     lock.releaseLock();
   }
   // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
-  try { kirimKonfirmasiSPL_(hasilSimpan.nomor); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  try { antri_({ t: 'konfirmasi', jenis: 'SPL', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 

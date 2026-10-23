@@ -283,7 +283,7 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
     }
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
-  try { cekSelesai_(jenis, nomor); } catch (e) { logAksi_(jenis, nomor, 'PDF GAGAL', '', String(e)); }
+  try { antri_({ t: 'selesai', jenis: jenis, nomor: nomor }); } catch (e) { logAksi_(jenis, nomor, 'PDF GAGAL', '', String(e)); }
   return pesan;
 }
 

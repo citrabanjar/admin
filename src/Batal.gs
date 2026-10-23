@@ -79,7 +79,19 @@ function prosesBatal(id, sig, alasan) {
     SpreadsheetApp.flush();
     logAksi_('SPL', [...new Set(kena.map(r => r['Nomor SPL']))].join(', '), 'DIBATALKAN', C.oleh.email, kena.length + ' karyawan, tgl ' + C.tgl + ' — ' + alasan);
   } finally { lock.releaseLock(); }
+  const tglTeks = kena[0]['Hari'] + ', ' + tglIndo_(kena[0]['Tanggal Lembur']);
+  try { antri_({ t: 'batal', id: id, alasan: alasan, ids: kena.map(r => String(r['ID Baris'])) }); }
+  catch (e) { logAksi_('SPL', id, 'EMAIL BATAL GAGAL', '', String(e)); }
+  return 'Lembur ' + kena.length + ' karyawan pada ' + escH_(tglTeks) + ' telah <b>DIBATALKAN</b>. Karyawan dan admin akan diberi tahu melalui email.';
+}
 
+/** Lanjutan pembatalan (email + rekap baru) — dijalankan dari antrian. */
+function batalLanjutan_(t) {
+  const alasan = t.alasan, m = String(t.id).match(/^([AO])\.([^.]+)\./);
+  const C = { oleh: karyawan_()[m[2].toUpperCase()] || { id: m[2], nama: m[2] } };
+  const set = {}; t.ids.forEach(i => set[i] = 1);
+  const kena = bacaBaris_('SPL').rows.filter(r => set[String(r['ID Baris'])]);
+  if (!kena.length) return;
   const K = karyawan_(), tgl = kena[0]['Hari'] + ', ' + tglIndo_(kena[0]['Tanggal Lembur']);
   // 1. email ke karyawan terdampak
   kena.forEach(r => {
@@ -108,5 +120,4 @@ function prosesBatal(id, sig, alasan) {
   // 3. rekap PDF dibuat ulang
   const sudah = {};
   [...new Set(kena.map(r => r['Nomor SPL']))].forEach(n => { try { rekapSPL_(n, true, sudah); } catch (e) { logAksi_('SPL', n, 'PDF GAGAL', '', String(e)); } });
-  return 'Lembur ' + kena.length + ' karyawan pada ' + escH_(tgl) + ' telah <b>DIBATALKAN</b>. Karyawan dan admin sudah diberi tahu melalui email.';
 }

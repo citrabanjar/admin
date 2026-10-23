@@ -98,7 +98,7 @@ function simpanSPD(token, d) {
   } finally {
     lock.releaseLock();
   }
-  try { kirimKonfirmasi_('SPD', hasilSimpan.nomor); } catch (e) { logAksi_('SPD', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  try { antri_({ t: 'konfirmasi', jenis: 'SPD', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPD', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 

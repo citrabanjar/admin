@@ -17,6 +17,7 @@ Sistem **Surat Perintah Lembur (SPL)** dan **Surat Perintah Dinas (SPD)** berbas
 | `src/Api.gs` | Pintu data hanya-baca (JSON) untuk pengecekan pengajuan lembur KantorKu |
 | `src/Ptj.gs` | Pertanggungjawaban Surat Perintah Dinas: daftar surat OPEN, simpan laporan realisasi, PDF laporan, status SELESAI |
 | `src/Batal.gs` | Pembatalan lembur oleh atasan / owner dari tombol di email rekap |
+| `src/Antrian.gs` | Antrian latar belakang: email konfirmasi, rekap PDF, dan email pembatalan dikerjakan pemicu 1 menit |
 | `src/Logo.gs` | Logo perusahaan (base64) |
 | `src/Form.html` | Tampilan form |
 | `src/appsscript.json` | Manifest (zona waktu Asia/Jakarta, Web App: execute as owner, akses Anyone) |
