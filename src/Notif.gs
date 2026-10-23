@@ -471,7 +471,7 @@ function selAtasan_(r) {
 function kopPdf_(judul, nomor) {
   return '<div style="border-bottom:3px solid #BE353F;padding-bottom:6px"><img src="' + LOGO_DATA_URI + '" style="height:46px"></div>' +
     '<div style="text-align:center;margin:12px 0 2px;font-size:15px;font-weight:bold;letter-spacing:.5px">' + judul + '</div>' +
-    '<div style="text-align:center;font-size:11px;margin-bottom:10px">Nomor : ' + escH_(nomor) + '</div>';
+    (nomor ? '<div style="text-align:center;font-size:11px;margin-bottom:10px">Nomor : ' + escH_(nomor) + '</div>' : '<div style="margin-bottom:10px"></div>');
 }
 function pdfDari_(html, nama) {
   return HtmlService.createHtmlOutput(html).getBlob().getAs('application/pdf').setName(nama);
@@ -535,21 +535,22 @@ function buatPdfSPL_(rows, opt) {
 
   const daftarNomor = banyak ? nomor.map(n => escH_(noSurat({ 'Nomor SPL': n })) + ' = ' + escH_(n)).join('<br>') : escH_(nomor[0]);
   const doc = '<html><head><meta charset="utf-8"><style>@page{size:A4 landscape;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
-    kopPdf_(banyak || opt.owner ? 'REKAP SURAT PERINTAH LEMBUR' : 'SURAT PERINTAH LEMBUR', banyak ? nomor.length + ' surat' : nomor[0]) +
+    kopPdf_(banyak || opt.owner ? 'REKAP SURAT PERINTAH LEMBUR' : 'SURAT PERINTAH LEMBUR', banyak ? '' : nomor[0]) +
     '<table style="font-size:10px;margin-bottom:4px"><tr><td style="width:110px">Tanggal Lembur</td><td>: <b>' + escH_(r0['Hari']) + ', ' + tglIndo_(r0['Tanggal Lembur']) + '</b></td></tr>' +
     '<tr><td>Status Hari</td><td>: ' + escH_(r0['Status Hari']) + '</td></tr>' +
-    (banyak ? '<tr><td style="vertical-align:top">Nomor Surat</td><td>: ' + daftarNomor + '</td></tr>' : '') +
-    '<tr><td>Diinput oleh</td><td>: ' + admin.map(escH_).join(', ') + '</td></tr></table>' +
+    (banyak && !opt.owner ? '<tr><td style="vertical-align:top">Nomor Surat</td><td>: ' + daftarNomor + '</td></tr>' : '') +   // owner/atasan: nomor ada di kolom tabel
+    (kolAdmin ? '' : '<tr><td>Diinput oleh</td><td>: ' + admin.map(escH_).join(', ') + '</td></tr>') + '</table>' +
     html +
     '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik' +
-    '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(admin.join(', '), 'Admin') + '</body></html>';
+    '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + (opt.owner ? ttdPdf_(null) : ttdPdf_(admin.join(', '), 'Admin')) + '</body></html>';
   return pdfDari_(doc, (opt.nama || 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + tglFile_(r0) + ')') + '.pdf');
 }
-function ttdPdf_(nama, jabatan) {
-  return '<table style="width:100%;margin-top:18px;font-size:10px;text-align:center"><tr><td>Dibuat oleh,</td><td>Diketahui oleh,</td><td>Disetujui oleh,</td></tr>' +
-    '<tr><td style="height:55px"></td><td></td><td></td></tr>' +
-    '<tr><td>( ' + escH_(nama) + ' )</td><td>(.........................)</td><td>(.........................)</td></tr>' +
-    '<tr><td>' + escH_(jabatan) + '</td><td>Manager Departemen</td><td>HRD</td></tr></table>';
+function ttdPdf_(nama, jabatan) {   // nama null → tanpa kolom "Dibuat oleh" (rekap owner / atasan)
+  const d = nama != null;
+  return '<table style="width:100%;margin-top:18px;font-size:10px;text-align:center"><tr>' + (d ? '<td>Dibuat oleh,</td>' : '') + '<td>Diketahui oleh,</td><td>Disetujui oleh,</td></tr>' +
+    '<tr><td style="height:55px"></td><td></td>' + (d ? '<td></td>' : '') + '</tr>' +
+    '<tr>' + (d ? '<td>( ' + escH_(nama) + ' )</td>' : '') + '<td>(.........................)</td><td>(.........................)</td></tr>' +
+    '<tr>' + (d ? '<td>' + escH_(jabatan) + '</td>' : '') + '<td>Manager Departemen</td><td>HRD</td></tr></table>';
 }
 
 /** PDF SPD mengikuti formulir Excel: A. Referensi, B. Detail, C. Personel, D. Biaya, E. Ketentuan, F. Pengesahan. */
