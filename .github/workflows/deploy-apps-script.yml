@@ -52,7 +52,12 @@ jobs:
           echo "{\"scriptId\":\"$SCRIPT_ID\",\"rootDir\":\"src\"}" > .clasp.json
 
       - name: Push kode ke Apps Script
-        run: clasp push --force
+        run: |
+          set -o pipefail
+          if ! clasp push --force 2>&1 | tee push.log; then
+            echo "::error title=clasp push gagal::$(tail -c 1500 push.log | tr '\n' ' ')"
+            exit 1
+          fi
 
       - name: Perbarui deployment Web App (link tetap sama)
         env:
