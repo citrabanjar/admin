@@ -138,7 +138,7 @@ function simpanPtjSPD(token, d) {
     if (I) ubahBaris_(Ind, I._row, { 'Status Dinas': 'Selesai', 'Tgl Laporan': now, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana, 'Uang Kas Dikembalikan': kasKembali, 'Link PDF Laporan': file.getUrl() });
     SpreadsheetApp.flush();
 
-    const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(u.nama) + '.</p>' +
+    const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(sdr_(u.nama)) + '.</p>' +
       '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + ' = <b>' + kasTeks_(kasKembali) + '</b>.<br>' +
       'Uang saku ' + rpH_(sakuReal) + ' dibayarkan melalui aplikasi KantorKu.</p>' +
       '<p>PDF laporan terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';

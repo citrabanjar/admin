@@ -123,24 +123,24 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
   const baris = jenis === 'SPL' ? [
     ['Nomor SPL', r['Nomor SPL']],
     ['Tanggal Lembur', r['Hari'] + ', ' + tglIndo_(r['Tanggal Lembur']) + ' (' + r['Status Hari'] + ')'],
-    ['Karyawan', r['Full Name'] + ' (' + r['Employee ID'] + ')'],
+    ['Karyawan', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
     ['Jam Lembur', r['Jam Mulai'] + ' – ' + r['Jam Selesai'] + (r['Istirahat'] && r['Istirahat'] !== '-' ? ' (istirahat ' + r['Istirahat'] + ')' : '')],
     ['Jam Efektif', String(r['Jam Efektif']).replace('.', ',') + ' jam'],
     ['Uraian Pekerjaan', r['Uraian Pekerjaan']]
   ].concat(denganKompensasi ? [['Estimasi Kompensasi', rpH_(r['Estimasi Kompensasi'])]] : [], [
-    ['Diperintahkan oleh', namaAtasan_(r['Employee ID']) || r['Dibuat Oleh']]
+    ['Diperintahkan oleh', sdr_(namaAtasan_(r['Employee ID']) || r['Dibuat Oleh'])]
   ]) : [
     ['Nomor SPD', r['Nomor SPD']],
     ['Maksud / Tujuan', I['Maksud / Tujuan']],
     ['Tempat Tujuan', I['Tempat Tujuan']],
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
-    ['Personel', r['Full Name'] + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
+    ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
     ['Uang Saku', rpH_(r['Uang Saku']) + ' (dibayarkan melalui aplikasi KantorKu)'],
   ].concat(Number(I['Uang Kas Perjalanan']) ? [['Uang Kas Perjalanan', rpH_(I['Uang Kas Perjalanan']) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
-    ['Diperintahkan oleh', namaAtasan_(r['Employee ID']) || I['Dibuat Oleh']]
+    ['Diperintahkan oleh', sdr_(namaAtasan_(r['Employee ID']) || I['Dibuat Oleh'])]
   ]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b =>
     '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' + escH_(b[0]) +
@@ -166,12 +166,12 @@ function kirimKonfirmasi_(jenis, nomor) {
     const k = K[String(r['Employee ID']).toUpperCase()] || {};
     const id = String(r['ID Baris']), keAdmin = !k.email;
     const isi = (keAdmin
-      ? '<p><b>' + escH_(r['Full Name']) + '</b> belum memiliki email di sistem. Mohon konfirmasi kesediaan ' + J.kata.toLowerCase() + ' <b>atas nama karyawan tersebut</b>:</p>'
-      : '<p>Yth. <b>' + escH_(r['Full Name']) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>') +
+      ? '<p><b>' + escH_(sdr_(r['Full Name'])) + '</b> belum memiliki email di sistem. Mohon konfirmasi kesediaan ' + J.kata.toLowerCase() + ' <b>atas nama karyawan tersebut</b>:</p>'
+      : '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>') +
       tabelDetail_(jenis, r, Ir, true) + '<p style="margin-top:18px">' +
       tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
     const err = kirimEmail_(keAdmin ? Ir['Email Pembuat'] : k.email,
-      'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + r['Full Name'] : ''), isi);
+      'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + sdr_(r['Full Name']) : ''), isi);
     ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ' + (keAdmin ? 'ke admin ' : '') + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
   });
 }
@@ -255,9 +255,9 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
       if (jawaban === 'tidak') {
         ubahBaris_(S, r._row, { 'Status': ST.TIDAK, 'Konfirmasi Pada': now, 'Alasan Tidak Bersedia': alas });
         const k = karyawan_()[String(r['Employee ID']).toUpperCase()] || {};
-        const isi = '<p><b>' + escH_(r['Full Name']) + '</b> menyatakan <b style="color:#B42318">TIDAK BERSEDIA</b> ' + J.kata.toLowerCase() + '.</p>' +
+        const isi = '<p><b>' + escH_(sdr_(r['Full Name'])) + '</b> menyatakan <b style="color:#B42318">TIDAK BERSEDIA</b> ' + J.kata.toLowerCase() + '.</p>' +
           tabelDetail_(jenis, r, I) + (alas ? '<p><b>Alasan:</b> ' + escH_(alas) + '</p>' : '');
-        kirimEmail_(I['Email Pembuat'], 'Tidak Bersedia ' + J.kata + ' — ' + r['Full Name'] + ' (' + tgl + ')', isi, k.email || '');
+        kirimEmail_(I['Email Pembuat'], 'Tidak Bersedia ' + J.kata + ' — ' + sdr_(r['Full Name']) + ' (' + tgl + ')', isi, k.email || '');
         logAksi_(jenis, nomor, 'TIDAK BERSEDIA', r['Full Name'], alas);
         pesan = 'Terima kasih. Ketidaksediaan Anda sudah dicatat dan diberitahukan ke admin.';
       } else {
@@ -265,13 +265,13 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
         const ke = atasan ? atasan.email : I['Email Pembuat'];
         ubahBaris_(S, r._row, { 'Status': ST.ATASAN, 'Konfirmasi Pada': now,
           'Atasan': atasan ? atasan.nama : '(admin — atasan belum diisi)', 'Email Atasan': ke });
-        const isi = (atasan ? '<p>Yth. <b>' + escH_(atasan.nama) + '</b>,</p>' : '<p><i>Atasan langsung karyawan ini belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
-          '<p><b>' + escH_(r['Full Name']) + '</b> telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> ' + J.kata.toLowerCase() + '. Mohon persetujuan Anda:</p>' + tabelDetail_(jenis, r, I) +
+        const isi = (atasan ? '<p>Yth. <b>' + escH_(sdr_(atasan.nama)) + '</b>,</p>' : '<p><i>Atasan langsung karyawan ini belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
+          '<p><b>' + escH_(sdr_(r['Full Name'])) + '</b> telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> ' + J.kata.toLowerCase() + '. Mohon persetujuan Anda:</p>' + tabelDetail_(jenis, r, I) +
           '<p style="margin-top:18px">' + tombol_(linkAksi_(J.t, id, 'ya'), '✅ Setujui', '#1E7B4A') + tombol_(linkAksi_(J.t, id, 'tidak'), '❌ Tolak', '#B42318') + '</p>';
-        const err = kirimEmail_(ke, 'Persetujuan ' + J.kata + ' — ' + r['Full Name'] + ' (' + tgl + ')', isi);
+        const err = kirimEmail_(ke, 'Persetujuan ' + J.kata + ' — ' + sdr_(r['Full Name']) + ' (' + tgl + ')', isi);
         ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke });
         logAksi_(jenis, nomor, 'BERSEDIA', r['Full Name'], 'Diteruskan ke ' + ke);
-        pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(atasan.nama) + ')' : 'admin') + ' untuk persetujuan.' +
+        pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(sdr_(atasan.nama)) + ')' : 'admin') + ' untuk persetujuan.' +
           (jenis === 'SPL' ? '</div>' + htmlInstruksiKantorku_() + '<div>' : '');
       }
     } else {
@@ -279,7 +279,7 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
       const setuju = jawaban !== 'tidak';
       ubahBaris_(S, r._row, { 'Status': setuju ? ST.SETUJU : ST.TOLAK, 'Disetujui Oleh': r['Atasan'], 'Disetujui Pada': now, 'Catatan Atasan': alas });
       logAksi_(jenis, nomor, setuju ? 'DISETUJUI ATASAN' : 'DITOLAK ATASAN', r['Email Atasan'], r['Full Name'] + (alas ? ' — ' + alas : ''));
-      pesan = 'Terima kasih. ' + J.kata + ' ' + escH_(r['Full Name']) + ' telah <b>' + (setuju ? 'DISETUJUI' : 'DITOLAK') + '</b>.';
+      pesan = 'Terima kasih. ' + J.kata + ' ' + escH_(sdr_(r['Full Name'])) + ' telah <b>' + (setuju ? 'DISETUJUI' : 'DITOLAK') + '</b>.';
     }
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
@@ -419,7 +419,7 @@ function rekapSPL_(nomor, paksa, sudah) {
     const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
     lama.forEach(hapusPdfLama_);
     grp.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Atasan': file.getUrl() }));
-    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + a.nama, true, 'A.' + a.id + '.' + tgl);
+    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + sdr_(a.nama), true, 'A.' + a.id + '.' + tgl);
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ATASAN DIPERBARUI' : 'PDF REKAP ATASAN', a.email, file.getUrl());
     hasil.push('PDF rekap atasan dikirim ke ' + a.nama);
   });
@@ -438,7 +438,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId) {
   const tgl = r0['Hari'] + ', ' + tglIndo_(r0['Tanggal Lembur']);
   const nomor = [...new Set(rows.map(r => r['Nomor SPL']))];
   const belum = rows.filter(r => ST_FINAL.indexOf(r['Status']) < 0).length;
-  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.toLowerCase()) : '') + '.</p>' +
+  const isi = '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.charAt(0).toLowerCase() + label.slice(1)) : '') + '.</p>' +
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> karena ada Surat Perintah Lembur susulan di tanggal yang sama. ' +
       'Laporan sebelumnya sudah dihapus — gunakan PDF terbaru ini.</p>' : '') +
     '<p>' + nomor.length + ' surat (' + nomor.map(escH_).join(', ') + ')<br>' +

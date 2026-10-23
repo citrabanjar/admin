@@ -32,17 +32,17 @@ function halamanBatal_(p) {
     const C = cakupanBatal_(p.id), r0 = C.rows[0];
     if (!r0) throw new Error('Data lembur tidak ditemukan.');
     isi = '<h2>Pembatalan Lembur</h2><p>' + escH_(r0['Hari']) + ', <b>' + tglIndo_(r0['Tanggal Lembur']) + '</b> — ' +
-      (C.owner ? 'seluruh karyawan' : 'karyawan di bawah <b>' + escH_(C.oleh.nama) + '</b>') + '</p>';
+      (C.owner ? 'seluruh karyawan' : 'karyawan di bawah <b>' + escH_(sdr_(C.oleh.nama)) + '</b>') + '</p>';
     if (!C.aktif.length) {
       isi += '<div class="msg info">Tidak ada lembur yang bisa dibatalkan (semua sudah dibatalkan / ditolak / tidak bersedia).</div>';
     } else {
       const th = 'padding:6px;background:#F4F5F7', td = 'padding:6px;border-top:1px solid #eee';
       isi += '<table style="border-collapse:collapse;width:100%;font-size:13px">' +
         '<tr><th style="text-align:left;' + th + '">Karyawan</th><th style="' + th + '">Jam</th><th style="' + th + '">Status</th></tr>' +
-        C.aktif.map(r => '<tr><td style="' + td + '"><b>' + escH_(r['Full Name']) + '</b><div class="sub">' + escH_(r['Uraian Pekerjaan']) +
+        C.aktif.map(r => '<tr><td style="' + td + '"><b>' + escH_(sdr_(r['Full Name'])) + '</b><div class="sub">' + escH_(r['Uraian Pekerjaan']) +
           ' · ' + escH_(r['Nomor SPL']) + '</div></td><td style="' + td + ';text-align:center;white-space:nowrap">' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) +
           '</td><td style="' + td + ';font-size:11px;text-align:center">' + escH_(r['Status']) + '</td></tr>').join('') + '</table>' +
-        '<p style="margin-top:14px"><b>' + C.aktif.length + ' lembur</b> di atas akan <b style="color:#B42318">DIBATALKAN</b> atas nama <b>' + escH_(C.oleh.nama) + '</b>.</p>' +
+        '<p style="margin-top:14px"><b>' + C.aktif.length + ' lembur</b> di atas akan <b style="color:#B42318">DIBATALKAN</b> atas nama <b>' + escH_(sdr_(C.oleh.nama)) + '</b>.</p>' +
         '<div id="al"><label>Alasan pembatalan *</label><textarea id="alasan" rows="3" placeholder="Wajib diisi"></textarea></div>' +
         '<button id="b" onclick="kirim()">Batalkan Lembur</button><div id="o"></div>' +
         '<script>function kirim(){var b=document.getElementById("b"),o=document.getElementById("o"),a=document.getElementById("alasan").value.trim();' +
@@ -86,24 +86,24 @@ function prosesBatal(id, sig, alasan) {
     const k = K[String(r['Employee ID']).toUpperCase()];
     if (!k || !k.email) return;
     kirimEmail_(k.email, 'Lembur Dibatalkan — ' + tgl,
-      '<p>Yth. <b>' + escH_(r['Full Name']) + '</b>,</p><p>Surat Perintah Lembur Anda pada <b>' + escH_(tgl) + '</b> ' +
-      '<b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>.</p>' + tabelDetail_('SPL', r) +
+      '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Surat Perintah Lembur Anda pada <b>' + escH_(tgl) + '</b> ' +
+      '<b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(sdr_(C.oleh.nama)) + '</b>.</p>' + tabelDetail_('SPL', r) +
       '<p><b>Alasan pembatalan:</b> ' + escH_(alasan) + '</p><p>Mohon tidak melaksanakan lembur tersebut. Bila sudah mengajukan lembur di aplikasi KantorKu, mohon dibatalkan.</p>');
   });
   // 2. email ke admin pembuat surat
   const perAdmin = {};
   kena.forEach(r => { const em = String(r['Email Pembuat']).toLowerCase(); (perAdmin[em] = perAdmin[em] || []).push(r); });
-  Object.keys(perAdmin).forEach(em => kirimEmail_(em, 'Lembur Dibatalkan oleh ' + C.oleh.nama + ' — ' + tgl,
-    '<p>Lembur berikut pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +
-    perAdmin[em].map(r => '<li><b>' + escH_(r['Full Name']) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' (' + escH_(r['Nomor SPL']) + ')</li>').join('') +
+  Object.keys(perAdmin).forEach(em => kirimEmail_(em, 'Lembur Dibatalkan oleh ' + sdr_(C.oleh.nama) + ' — ' + tgl,
+    '<p>Lembur berikut pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(sdr_(C.oleh.nama)) + '</b>:</p><ul>' +
+    perAdmin[em].map(r => '<li><b>' + escH_(sdr_(r['Full Name'])) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' (' + escH_(r['Nomor SPL']) + ')</li>').join('') +
     '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p><p>Bila diperlukan, karyawan tersebut dapat diinput ulang melalui form pada tanggal yang sama. Riwayat pembatalan tetap tersimpan.</p>'));
   // 2b. tembusan ke atasan langsung karyawan (bila yang membatalkan bukan atasan itu sendiri)
   const perAtasan = {};
   kena.forEach(r => rantaiAtasan_(r['Employee ID']).forEach(a => {   // semua atasan di rantai (tanpa owner)
     if (a && a.id !== C.oleh.id && !isOwner_(a)) (perAtasan[a.id] = perAtasan[a.id] || { a: a, rows: [] }).rows.push(r); }));
-  Object.values(perAtasan).forEach(x => kirimEmail_(x.a.email, 'Tembusan: Lembur Dibatalkan oleh ' + C.oleh.nama + ' — ' + tgl,
-    '<p>Yth. <b>' + escH_(x.a.nama) + '</b>,</p><p>Lembur karyawan di bawah Anda pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(C.oleh.nama) + '</b>:</p><ul>' +
-    x.rows.map(r => '<li><b>' + escH_(r['Full Name']) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' — ' + escH_(r['Uraian Pekerjaan']) + '</li>').join('') +
+  Object.values(perAtasan).forEach(x => kirimEmail_(x.a.email, 'Tembusan: Lembur Dibatalkan oleh ' + sdr_(C.oleh.nama) + ' — ' + tgl,
+    '<p>Yth. <b>' + escH_(sdr_(x.a.nama)) + '</b>,</p><p>Lembur karyawan di bawah Anda pada <b>' + escH_(tgl) + '</b> <b style="color:#B42318">DIBATALKAN</b> oleh <b>' + escH_(sdr_(C.oleh.nama)) + '</b>:</p><ul>' +
+    x.rows.map(r => '<li><b>' + escH_(sdr_(r['Full Name'])) + '</b> ' + escH_(r['Jam Mulai']) + '–' + escH_(r['Jam Selesai']) + ' — ' + escH_(r['Uraian Pekerjaan']) + '</li>').join('') +
     '</ul><p><b>Alasan:</b> ' + escH_(alasan) + '</p>'));
   // 3. rekap PDF dibuat ulang
   const sudah = {};
