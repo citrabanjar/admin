@@ -536,7 +536,7 @@ function buatPdfSPL_(rows, opt) {
     (banyak ? '<tr><td style="vertical-align:top">Nomor Surat</td><td>: ' + daftarNomor + '</td></tr>' : '') +
     '<tr><td>Diinput oleh</td><td>: ' + admin.map(escH_).join(', ') + '</td></tr></table>' +
     html +
-    '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL ' + escH_(P.NAMA_PERUSAHAAN || '') +
+    '<p style="font-size:9px;color:#555;margin-top:10px">Konfirmasi karyawan dan persetujuan atasan dilakukan secara elektronik' +
     '. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' + ttdPdf_(admin.join(', '), 'Admin') + '</body></html>';
   return pdfDari_(doc, (opt.nama || 'SPL ' + String(r0['Nomor SPL']).replace(/\s*\/\s*/g, '-') + ' (' + tglFile_(r0) + ')') + '.pdf');
 }
@@ -595,7 +595,7 @@ function buatPdfSPD_(I, rows) {
       '<div style="height:50px"></div><div style="text-align:center;color:#555">( Nama, Tanda Tangan & Stempel Instansi )</div></td>').join('') + '</tr></table>' +
     '<p style="text-align:right;font-size:10px;margin-top:12px">Dikeluarkan di : ' + (P.KOTA_SURAT ? escH_(P.KOTA_SURAT) + ', ' : '') + tglIndo_(I['Tanggal Surat']) + '</p>' +
     ttdPdf_(I['Dibuat Oleh'], 'Admin').replace('Manager Departemen', 'Manager Departemen') +
-    '<p style="font-size:8px;color:#777;margin-top:8px">Konfirmasi personel dan persetujuan atasan dilakukan secara elektronik melalui Sistem SPL & SPD. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' +
+    '<p style="font-size:8px;color:#777;margin-top:8px">Konfirmasi personel dan persetujuan atasan dilakukan secara elektronik. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' +
     '</body></html>';
   return pdfDari_(html, 'SPD ' + String(I['Nomor SPD']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(tglB, TZ, 'dd-MM-yyyy') + ').pdf');
 }

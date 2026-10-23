@@ -196,6 +196,6 @@ function buatPdfPtj_(S, R) {
     '<tr><td style="height:55px"></td><td></td><td></td></tr>' +
     '<tr><td>( ' + escH_(R.oleh) + ' )</td><td>(.........................)</td><td>(.........................)</td></tr>' +
     '<tr><td>Admin</td><td>Finance</td><td>HRD</td></tr></table>' +
-    '<p style="font-size:8px;color:#777;margin-top:8px">Dokumen dibuat otomatis oleh Sistem SPL & SPD pada ' + waktuIndo_(new Date()) + '.</p></body></html>';
+    '<p style="font-size:8px;color:#777;margin-top:8px">Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p></body></html>';
   return pdfDari_(html, 'Laporan Dinas ' + String(S.nomor).replace(/\s*\/\s*/g, '-') + '.pdf');
 }
