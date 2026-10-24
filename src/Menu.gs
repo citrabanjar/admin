@@ -21,7 +21,7 @@ function onOpen() {
     .addSeparator()
     .addItem('🔗 Link form', 'bukaForm')
     .addSeparator()
-    .addItem('✉ Kirim ulang email konfirmasi (SPL/SPD)', 'menuKirimUlangKonfirmasi')
+    .addItem('✉ Kirim ulang email konfirmasi / persetujuan', 'menuKirimUlangKonfirmasi')
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')

@@ -265,11 +265,7 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
         const ke = atasan ? atasan.email : I['Email Pembuat'];
         ubahBaris_(S, r._row, { 'Status': ST.ATASAN, 'Konfirmasi Pada': now,
           'Atasan': atasan ? atasan.nama : '(admin — atasan belum diisi)', 'Email Atasan': ke });
-        const isi = (atasan ? '<p>Yth. <b>' + escH_(sdr_(atasan.nama)) + '</b>,</p>' : '<p><i>Atasan langsung karyawan ini belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
-          '<p><b>' + escH_(sdr_(r['Full Name'])) + '</b> telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> ' + J.kata.toLowerCase() + '. Mohon persetujuan Anda:</p>' + tabelDetail_(jenis, r, I) +
-          '<p style="margin-top:18px">' + tombol_(linkAksi_(J.t, id, 'ya'), '✅ Setujui', '#1E7B4A') + tombol_(linkAksi_(J.t, id, 'tidak'), '❌ Tolak', '#B42318') + '</p>';
-        const err = kirimEmail_(ke, 'Persetujuan ' + J.kata + ' — ' + sdr_(r['Full Name']) + ' (' + tgl + ')', isi);
-        ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke });
+        kirimPersetujuan_(jenis, S, r, I, atasan, ke);
         logAksi_(jenis, nomor, 'BERSEDIA', r['Full Name'], 'Diteruskan ke ' + ke);
         pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(sdr_(atasan.nama)) + ')' : 'admin') + ' untuk persetujuan.' +
           (jenis === 'SPL' ? '</div>' + htmlInstruksiKantorku_() + '<div>' : '');
@@ -643,11 +639,30 @@ function menuPdfSPL() {
   const n = r.getResponseText().trim();
   ui.alert(cekSelesai_(jenisDariNomor_(n), n, true) || 'Selesai.');
 }
+/** Email permintaan persetujuan ke atasan (dipakai saat karyawan Bersedia & saat kirim ulang). */
+function kirimPersetujuan_(jenis, S, r, I, atasan, ke) {
+  const J = JENIS[jenis], id = String(r['ID Baris']), tgl = ringkasTanggal_(jenis, r, I);
+        const isi = (atasan ? '<p>Yth. <b>' + escH_(sdr_(atasan.nama)) + '</b>,</p>' : '<p><i>Atasan langsung karyawan ini belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
+          '<p><b>' + escH_(sdr_(r['Full Name'])) + '</b> telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> ' + J.kata.toLowerCase() + '. Mohon persetujuan Anda:</p>' + tabelDetail_(jenis, r, I) +
+          '<p style="margin-top:18px">' + tombol_(linkAksi_(J.t, id, 'ya'), '✅ Setujui', '#1E7B4A') + tombol_(linkAksi_(J.t, id, 'tidak'), '❌ Tolak', '#B42318') + '</p>';
+        const err = kirimEmail_(ke, 'Persetujuan ' + J.kata + ' — ' + sdr_(r['Full Name']) + ' (' + tgl + ')', isi);
+        ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke });
+  return err;
+}
+
 function menuKirimUlangKonfirmasi() {
   const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('Kirim ulang email konfirmasi', 'Masukkan Nomor SPL / SPD. Email dikirim ulang ke yang statusnya masih MENUNGGU KONFIRMASI.', ui.ButtonSet.OK_CANCEL);
+  const r = ui.prompt('Kirim ulang email', 'Masukkan Nomor SPL / SPD. Email dikirim ulang ke karyawan yang MENUNGGU KONFIRMASI dan ke atasan untuk yang MENUNGGU ATASAN.', ui.ButtonSet.OK_CANCEL);
   if (r.getSelectedButton() !== ui.Button.OK) return;
   const n = r.getResponseText().trim();
-  kirimKonfirmasi_(jenisDariNomor_(n), n);
-  ui.alert('Selesai. Lihat kolom "Status Email" di sheet ' + (jenisDariNomor_(n) === 'SPD' ? 'Personel SPD' : 'Data SPL') + '.');
+  const jenis = jenisDariNomor_(n);
+  kirimKonfirmasi_(jenis, n);
+  // kirim ulang juga permintaan persetujuan yang masih MENUNGGU ATASAN
+  const J = JENIS[jenis], S = bacaBaris_(jenis);
+  let nAtasan = 0;
+  S.rows.filter(x => x[J.kunci] === n && x['Status'] === ST.ATASAN).forEach(x => {
+    const I = induk_(jenis, n, x), atasan = jenis === 'SPD' ? penyetujuDinas_(x['Employee ID']) : cariAtasan_(x['Employee ID']);
+    kirimPersetujuan_(jenis, S, x, I, atasan, atasan ? atasan.email : I['Email Pembuat']); nAtasan++;
+  });
+  ui.alert('Selesai. Email konfirmasi (yang masih MENUNGGU KONFIRMASI) dan ' + nAtasan + ' email persetujuan (MENUNGGU ATASAN) dikirim ulang.\nLihat kolom "Status Email" di sheet ' + (jenis === 'SPD' ? 'Personel SPD' : 'Data SPL') + '.');
 }
