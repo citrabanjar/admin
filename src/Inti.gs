@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V1';
+const CACHE_KARYAWAN = 'KARYAWAN_V2';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -103,6 +103,7 @@ function karyawan_() {
       email: String(r['Email'] || '').trim().toLowerCase(),
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
+      akses: String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),   // kosong = semua form
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
@@ -289,4 +290,15 @@ if (typeof module !== 'undefined') module.exports = { hitungLembur_, hitungSPD_,
 function sdr_(nama) {
   return 'Sdr. ' + String(nama || '').trim().split(/(\([^)]*\))/).map(b => b.charAt(0) === '(' ? b :
     b.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, c) => a + c.toUpperCase())).join('');
+}
+
+/* ---------- Hak akses form per admin (kolom "Akses Form" di Data Karyawan) ----------
+ *  Kosong / SEMUA = semua form.  Isi: LEMBUR, DINAS (boleh lebih dari satu, pisahkan koma). */
+const DAFTAR_AKSES = ['LEMBUR', 'DINAS'];
+function punyaAkses_(k, jenis) {
+  const a = (k && k.akses) || [];
+  return !a.length || a.indexOf('SEMUA') >= 0 || a.indexOf(jenis) >= 0;
+}
+function cekAkses_(k, jenis) {
+  if (!punyaAkses_(k, jenis)) throw new Error('Anda tidak memiliki akses ke form Surat Perintah ' + (jenis === 'LEMBUR' ? 'Lembur' : 'Dinas') + '.');
 }

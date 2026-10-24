@@ -59,7 +59,8 @@ function dataSpd_(nomor) {
 
 /** Daftar Surat Perintah Dinas yang masih OPEN (belum ada pertanggungjawaban). Semua admin bisa melihat. */
 function spdOpen(token) {
-  sesiCek_(token);
+  const u0 = sesiCek_(token);
+  if (!punyaAkses_(u0, 'DINAS')) return [];
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Status Dinas'] || 'Aktif') !== 'Selesai')
     .map(r => dataSpd_(r['Nomor SPD']))
@@ -75,6 +76,7 @@ function spdOpen(token) {
  */
 function simpanPtjSPD(token, d) {
   const u = sesiCek_(token);
+  cekAkses_(u, 'DINAS');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');
   let hasil;

@@ -70,6 +70,15 @@ function setupAwal() {
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
+  // Kolom Akses Form: form apa saja yang boleh dibuka ADMIN (kosong = semua)
+  let colAkses = kolom_(SH.KARYAWAN)['Akses Form'];
+  if (!colAkses) {
+    colAkses = shK.getLastColumn() + 1;
+    shK.getRange(1, colAkses).setValue('Akses Form').setFontWeight('bold')
+       .setNote('Khusus ADMIN. Kosong = semua form. Isi LEMBUR, DINAS, atau "LEMBUR, DINAS" (pisahkan koma).');
+  }
+  shK.getRange(2, colAkses, shK.getMaxRows() - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(['LEMBUR', 'DINAS', 'LEMBUR, DINAS'], true).setAllowInvalid(true).build());
   // Parameter tambahan (dibuat bila belum ada)
   const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
   [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).'],

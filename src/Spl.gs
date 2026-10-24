@@ -12,6 +12,7 @@
  */
 function simpanSPL(token, data) {
   const u = sesiCek_(token);
+  cekAkses_(u, 'LEMBUR');
   pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba simpan lagi beberapa detik lagi.');
@@ -91,6 +92,7 @@ function catatLibur_(tglStr, oleh) {
 /** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
 function riwayatSPL(token) {
   const u = sesiCek_(token);
+  if (!punyaAkses_(u, 'LEMBUR')) return [];
   const g = {};
   bacaTabel_(SH.SPL, 'Nomor SPL').forEach(r => {
     if (String(r['Email Pembuat']).toLowerCase() !== u.email) return;

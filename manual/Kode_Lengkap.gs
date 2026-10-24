@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V1';
+const CACHE_KARYAWAN = 'KARYAWAN_V2';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -103,6 +103,7 @@ function karyawan_() {
       email: String(r['Email'] || '').trim().toLowerCase(),
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
+      akses: String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),   // kosong = semua form
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
@@ -290,6 +291,17 @@ function sdr_(nama) {
   return 'Sdr. ' + String(nama || '').trim().split(/(\([^)]*\))/).map(b => b.charAt(0) === '(' ? b :
     b.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, c) => a + c.toUpperCase())).join('');
 }
+
+/* ---------- Hak akses form per admin (kolom "Akses Form" di Data Karyawan) ----------
+ *  Kosong / SEMUA = semua form.  Isi: LEMBUR, DINAS (boleh lebih dari satu, pisahkan koma). */
+const DAFTAR_AKSES = ['LEMBUR', 'DINAS'];
+function punyaAkses_(k, jenis) {
+  const a = (k && k.akses) || [];
+  return !a.length || a.indexOf('SEMUA') >= 0 || a.indexOf(jenis) >= 0;
+}
+function cekAkses_(k, jenis) {
+  if (!punyaAkses_(k, jenis)) throw new Error('Anda tidak memiliki akses ke form Surat Perintah ' + (jenis === 'LEMBUR' ? 'Lembur' : 'Dinas') + '.');
+}
 /**
  * =====================================================================
  *  SISTEM SPL & SPD — File : Menu.gs   (TAHAP 1)
@@ -362,6 +374,15 @@ function setupAwal() {
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
+  // Kolom Akses Form: form apa saja yang boleh dibuka ADMIN (kosong = semua)
+  let colAkses = kolom_(SH.KARYAWAN)['Akses Form'];
+  if (!colAkses) {
+    colAkses = shK.getLastColumn() + 1;
+    shK.getRange(1, colAkses).setValue('Akses Form').setFontWeight('bold')
+       .setNote('Khusus ADMIN. Kosong = semua form. Isi LEMBUR, DINAS, atau "LEMBUR, DINAS" (pisahkan koma).');
+  }
+  shK.getRange(2, colAkses, shK.getMaxRows() - 1, 1).setDataValidation(
+    SpreadsheetApp.newDataValidation().requireValueInList(['LEMBUR', 'DINAS', 'LEMBUR, DINAS'], true).setAllowInvalid(true).build());
   // Parameter tambahan (dibuat bila belum ada)
   const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
   [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).'],
@@ -523,7 +544,7 @@ function pembuatByEmail_(email) {
   const k = cariKaryawanByEmail_(email);
   return (k && k.aktif && PERAN_PEMBUAT.indexOf(k.peran) >= 0) ? k : null;
 }
-function infoUser_(k) { return { id: k.id, nama: k.nama, jabatan: k.jabatan, departemen: k.departemen, peran: k.peran, email: k.email }; }
+function infoUser_(k) { return { akses: DAFTAR_AKSES.filter(j => punyaAkses_(k, j)), id: k.id, nama: k.nama, jabatan: k.jabatan, departemen: k.departemen, peran: k.peran, email: k.email }; }
 /** Sesi login disimpan di Script Properties (bertahan 30 hari, tidak hilang seperti cache). */
 function sesiBuat_(email) {
   const tok = Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '');
@@ -674,6 +695,7 @@ function suratAktif_(dari, sampai) {
  */
 function simpanSPL(token, data) {
   const u = sesiCek_(token);
+  cekAkses_(u, 'LEMBUR');
   pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba simpan lagi beberapa detik lagi.');
@@ -753,6 +775,7 @@ function catatLibur_(tglStr, oleh) {
 /** Riwayat SPL buatan user (30 terakhir), dikelompokkan per nomor, dengan status per karyawan. */
 function riwayatSPL(token) {
   const u = sesiCek_(token);
+  if (!punyaAkses_(u, 'LEMBUR')) return [];
   const g = {};
   bacaTabel_(SH.SPL, 'Nomor SPL').forEach(r => {
     if (String(r['Email Pembuat']).toLowerCase() !== u.email) return;
@@ -790,6 +813,7 @@ function riwayatSPL(token) {
  */
 function simpanSPD(token, d) {
   const u = sesiCek_(token);
+  cekAkses_(u, 'DINAS');
   pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
   pastikanKolom_(SH.SPD, ['Uang Kas Perjalanan']);
   const lock = LockService.getScriptLock();
@@ -880,6 +904,7 @@ function simpanSPD(token, d) {
 /** Riwayat SPD buatan user (30 terakhir). */
 function riwayatSPD(token) {
   const u = sesiCek_(token);
+  if (!punyaAkses_(u, 'DINAS')) return [];
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
     (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });
@@ -1932,7 +1957,8 @@ function dataSpd_(nomor) {
 
 /** Daftar Surat Perintah Dinas yang masih OPEN (belum ada pertanggungjawaban). Semua admin bisa melihat. */
 function spdOpen(token) {
-  sesiCek_(token);
+  const u0 = sesiCek_(token);
+  if (!punyaAkses_(u0, 'DINAS')) return [];
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Status Dinas'] || 'Aktif') !== 'Selesai')
     .map(r => dataSpd_(r['Nomor SPD']))
@@ -1948,6 +1974,7 @@ function spdOpen(token) {
  */
 function simpanPtjSPD(token, d) {
   const u = sesiCek_(token);
+  cekAkses_(u, 'DINAS');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');
   let hasil;

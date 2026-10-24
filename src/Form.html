@@ -155,17 +155,17 @@
     <section id="pHome">
       <h2 class="judul">Pilih jenis surat yang akan dibuat</h2>
       <div class="pilih">
-        <button onclick="buka('spl')">
+        <button data-akses="LEMBUR" onclick="buka('spl')">
           <div class="ic">⏱️</div>
           <div class="t">Surat Perintah Lembur</div>
           <div class="d">Perintah kerja lembur untuk satu tanggal — bisa banyak karyawan sekaligus. Jam efektif & istirahat dihitung otomatis.</div>
         </button>
-        <button onclick="buka('spd')">
+        <button data-akses="DINAS" onclick="buka('spd')">
           <div class="ic">🚗</div>
           <div class="t">Surat Perintah Dinas</div>
           <div class="d">Penugasan perjalanan dinas luar — uang saku & biaya dihitung otomatis.</div>
         </button>
-        <button onclick="buka('ptj')">
+        <button data-akses="DINAS" onclick="buka('ptj')">
           <div class="ic">📋</div>
           <div class="t">Pertanggungjawaban Dinas</div>
           <div class="d">Selesaikan laporan perjalanan dinas yang masih <b>OPEN</b> — <b id="nOpen">…</b></div>
@@ -332,8 +332,8 @@
         <div class="bar" style="margin-top:0">
           <div class="filter" id="fRw">
             <button class="on" data-f="" onclick="filterRw('')">Semua</button>
-            <button data-f="SPL" onclick="filterRw('SPL')">Lembur</button>
-            <button data-f="SPD" onclick="filterRw('SPD')">Dinas</button>
+            <button data-f="SPL" data-akses="LEMBUR" onclick="filterRw('SPL')">Lembur</button>
+            <button data-f="SPD" data-akses="DINAS" onclick="filterRw('SPD')">Dinas</button>
           </div>
           <button class="btn sec kecil" onclick="muatRiwayat()">↻ Muat ulang</button>
         </div>
@@ -496,6 +496,10 @@ async function masukDengan(tok) {
   TOKEN = tok; simpanToken(tok);
   $('userNama').textContent = D.user.nama; $('userJab').textContent = D.user.jabatan + ' · ' + D.user.peran;
   $('userBox').classList.remove('hide');
+  // tampilkan hanya kartu / menu yang boleh diakses admin ini
+  const AK = D.user.akses || ['LEMBUR', 'DINAS'];
+  document.querySelectorAll('[data-akses]').forEach(el => el.classList.toggle('hide', AK.indexOf(el.dataset.akses) < 0));
+  if (!AK.length) $('pHome').querySelector('.judul').textContent = 'Akun Anda belum diberi akses ke form apa pun. Hubungi pengelola sistem.';
   splBaru(); spdBaru();
   tampil('vApp'); buka('home');
 }
@@ -511,11 +515,13 @@ document.addEventListener('keydown', e => {
 });
 
 /* ===== navigasi ===== */
+function boleh_(p) { const AK = (D && D.user.akses) || ['LEMBUR', 'DINAS']; return p === 'spl' ? AK.indexOf('LEMBUR') >= 0 : (p === 'spd' || p === 'ptj') ? AK.indexOf('DINAS') >= 0 : true; }
 function buka(p) {
+  if (!boleh_(p)) p = 'home';
   ['home', 'spl', 'spd', 'ptj', 'riwayat'].forEach(x => $('p' + x[0].toUpperCase() + x.slice(1)).classList.toggle('hide', x !== p));
   document.querySelectorAll('.nav button').forEach(b => b.classList.toggle('on', b.dataset.p === p));
   if (p === 'riwayat' || p === 'home') muatRiwayat();
-  if (p === 'ptj' || p === 'home') muatOpen();
+  if ((p === 'ptj' || p === 'home') && boleh_('ptj')) muatOpen();
   if (p === 'ptj') tutupPtj();
   window.scrollTo(0, 0);
 }
