@@ -106,7 +106,7 @@ function simpanSPD(token, d) {
 /** Riwayat SPD buatan user (30 terakhir). */
 function riwayatSPD(token) {
   const u = sesiCek_(token);
-  if (!punyaAkses_(u, 'DINAS')) return [];
+  if (!punyaAkses_(u, 'DINAS') && !punyaAkses_(u, 'PTJ')) return [];
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
     (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });

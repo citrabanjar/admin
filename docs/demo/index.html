@@ -193,7 +193,7 @@ window.SERVER={
           <div class="t">Surat Perintah Dinas</div>
           <div class="d">Penugasan perjalanan dinas luar — uang saku & biaya dihitung otomatis.</div>
         </button>
-        <button data-akses="DINAS" onclick="buka('ptj')">
+        <button data-akses="PTJ" onclick="buka('ptj')">
           <div class="ic">📋</div>
           <div class="t">Pertanggungjawaban Dinas</div>
           <div class="d">Selesaikan laporan perjalanan dinas yang masih <b>OPEN</b> — <b id="nOpen">…</b></div>
@@ -361,7 +361,7 @@ window.SERVER={
           <div class="filter" id="fRw">
             <button class="on" data-f="" onclick="filterRw('')">Semua</button>
             <button data-f="SPL" data-akses="LEMBUR" onclick="filterRw('SPL')">Lembur</button>
-            <button data-f="SPD" data-akses="DINAS" onclick="filterRw('SPD')">Dinas</button>
+            <button data-f="SPD" data-akses="DINAS PTJ" onclick="filterRw('SPD')">Dinas</button>
           </div>
           <button class="btn sec kecil" onclick="muatRiwayat()">↻ Muat ulang</button>
         </div>
@@ -626,8 +626,8 @@ async function masukDengan(tok) {
   $('userNama').textContent = D.user.nama; $('userJab').textContent = D.user.jabatan + ' · ' + D.user.peran;
   $('userBox').classList.remove('hide');
   // tampilkan hanya kartu / menu yang boleh diakses admin ini
-  const AK = D.user.akses || ['LEMBUR', 'DINAS'];
-  document.querySelectorAll('[data-akses]').forEach(el => el.classList.toggle('hide', AK.indexOf(el.dataset.akses) < 0));
+  const AK = D.user.akses || ['LEMBUR', 'DINAS', 'PTJ'];
+  document.querySelectorAll('[data-akses]').forEach(el => el.classList.toggle('hide', !el.dataset.akses.split(' ').some(a => AK.indexOf(a) >= 0)));
   if (!AK.length) $('pHome').querySelector('.judul').textContent = 'Akun Anda belum diberi akses ke form apa pun. Hubungi pengelola sistem.';
   splBaru(); spdBaru();
   tampil('vApp'); buka('home');
@@ -644,7 +644,7 @@ document.addEventListener('keydown', e => {
 });
 
 /* ===== navigasi ===== */
-function boleh_(p) { const AK = (D && D.user.akses) || ['LEMBUR', 'DINAS']; return p === 'spl' ? AK.indexOf('LEMBUR') >= 0 : (p === 'spd' || p === 'ptj') ? AK.indexOf('DINAS') >= 0 : true; }
+function boleh_(p) { const AK = (D && D.user.akses) || ['LEMBUR', 'DINAS', 'PTJ']; const k = { spl: 'LEMBUR', spd: 'DINAS', ptj: 'PTJ' }[p]; return !k || AK.indexOf(k) >= 0; }
 function buka(p) {
   if (!boleh_(p)) p = 'home';
   ['home', 'spl', 'spd', 'ptj', 'riwayat'].forEach(x => $('p' + x[0].toUpperCase() + x.slice(1)).classList.toggle('hide', x !== p));

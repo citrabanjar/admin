@@ -71,11 +71,11 @@ function setupAwal() {
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
   // Kolom akses form (kotak centang) — form apa saja yang boleh dibuka ADMIN
-  [['Akses Lembur', 'LEMBUR'], ['Akses Dinas', 'DINAS']].forEach(([judul, jenis]) => {
+  KARTU.forEach(({ kolom: judul, kode: jenis }) => {
     const c0 = kolom_(SH.KARYAWAN);
     let col = c0[judul];
     const baru = !col;
-    if (baru) { col = shK.getLastColumn() + 1; shK.getRange(1, col).setValue(judul).setFontWeight('bold').setNote('Centang bila ADMIN ini boleh membuka form ' + judul.replace('Akses ', '') + '.'); }
+    if (baru) { col = shK.getLastColumn() + 1; shK.getRange(1, col).setValue(judul).setFontWeight('bold').setNote('Centang bila ADMIN ini boleh membuka kartu ' + judul.replace('Akses ', '') + ' di form.'); }
     const n = shK.getMaxRows() - 1;
     if (n < 1) return;
     const rg = shK.getRange(2, col, n, 1);
@@ -84,6 +84,7 @@ function setupAwal() {
       rg.setValues(v.map(r => {
         const peran = String(r[(c['Peran'] || 0) - 1] || '').trim().toUpperCase();
         const lama = String(c['Akses Form'] ? r[c['Akses Form'] - 1] : '').toUpperCase();
+        if (jenis === 'PTJ' && c['Akses Dinas']) return [r[c['Akses Dinas'] - 1] === true];   // ikut akses Dinas yang sudah ada
         return [peran === 'ADMIN' && (!lama.trim() || lama.indexOf(jenis) >= 0 || lama.indexOf('SEMUA') >= 0)];
       }));
     }

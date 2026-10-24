@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V3';
+const CACHE_KARYAWAN = 'KARYAWAN_V4';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -104,9 +104,9 @@ function karyawan_() {
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
       // akses form: kotak centang "Akses Lembur" / "Akses Dinas" (bila kolomnya ada), atau kolom teks lama "Akses Form" (kosong = semua)
-      aksesCek: ('Akses Lembur' in r) || ('Akses Dinas' in r),
-      akses: (('Akses Lembur' in r) || ('Akses Dinas' in r))
-        ? ['LEMBUR', 'DINAS'].filter(j => r['Akses ' + (j === 'LEMBUR' ? 'Lembur' : 'Dinas')] === true)
+      aksesCek: KARTU.some(x => x.kolom in r),
+      akses: KARTU.some(x => x.kolom in r)
+        ? KARTU.filter(x => r[x.kolom] === true).map(x => x.kode)
         : String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
@@ -298,14 +298,20 @@ function sdr_(nama) {
 
 /* ---------- Hak akses form per admin (kolom "Akses Form" di Data Karyawan) ----------
  *  Kosong / SEMUA = semua form.  Isi: LEMBUR, DINAS (boleh lebih dari satu, pisahkan koma). */
-const DAFTAR_AKSES = ['LEMBUR', 'DINAS'];
+/** Daftar kartu di Beranda form. Tambah kartu baru = tambah 1 baris di sini → Setup awal membuat kolom centangnya. */
+const KARTU = [
+  { kode: 'LEMBUR', kolom: 'Akses Lembur', nama: 'Surat Perintah Lembur' },
+  { kode: 'DINAS', kolom: 'Akses Dinas', nama: 'Surat Perintah Dinas' },
+  { kode: 'PTJ', kolom: 'Akses Pertanggungjawaban Dinas', nama: 'Pertanggungjawaban Dinas' }
+];
+const DAFTAR_AKSES = KARTU.map(x => x.kode);
 function punyaAkses_(k, jenis) {
   const a = (k && k.akses) || [];
   if (k && k.aksesCek) return a.indexOf(jenis) >= 0;   // mode kotak centang: harus dicentang
   return !a.length || a.indexOf('SEMUA') >= 0 || a.indexOf(jenis) >= 0;
 }
 function cekAkses_(k, jenis) {
-  if (!punyaAkses_(k, jenis)) throw new Error('Anda tidak memiliki akses ke form Surat Perintah ' + (jenis === 'LEMBUR' ? 'Lembur' : 'Dinas') + '.');
+  if (!punyaAkses_(k, jenis)) throw new Error('Anda tidak memiliki akses ke form ' + ((KARTU.find(x => x.kode === jenis) || {}).nama || jenis) + '.');
 }
 /**
  * =====================================================================
@@ -380,11 +386,11 @@ function setupAwal() {
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
   // Kolom akses form (kotak centang) — form apa saja yang boleh dibuka ADMIN
-  [['Akses Lembur', 'LEMBUR'], ['Akses Dinas', 'DINAS']].forEach(([judul, jenis]) => {
+  KARTU.forEach(({ kolom: judul, kode: jenis }) => {
     const c0 = kolom_(SH.KARYAWAN);
     let col = c0[judul];
     const baru = !col;
-    if (baru) { col = shK.getLastColumn() + 1; shK.getRange(1, col).setValue(judul).setFontWeight('bold').setNote('Centang bila ADMIN ini boleh membuka form ' + judul.replace('Akses ', '') + '.'); }
+    if (baru) { col = shK.getLastColumn() + 1; shK.getRange(1, col).setValue(judul).setFontWeight('bold').setNote('Centang bila ADMIN ini boleh membuka kartu ' + judul.replace('Akses ', '') + ' di form.'); }
     const n = shK.getMaxRows() - 1;
     if (n < 1) return;
     const rg = shK.getRange(2, col, n, 1);
@@ -393,6 +399,7 @@ function setupAwal() {
       rg.setValues(v.map(r => {
         const peran = String(r[(c['Peran'] || 0) - 1] || '').trim().toUpperCase();
         const lama = String(c['Akses Form'] ? r[c['Akses Form'] - 1] : '').toUpperCase();
+        if (jenis === 'PTJ' && c['Akses Dinas']) return [r[c['Akses Dinas'] - 1] === true];   // ikut akses Dinas yang sudah ada
         return [peran === 'ADMIN' && (!lama.trim() || lama.indexOf(jenis) >= 0 || lama.indexOf('SEMUA') >= 0)];
       }));
     }
@@ -920,7 +927,7 @@ function simpanSPD(token, d) {
 /** Riwayat SPD buatan user (30 terakhir). */
 function riwayatSPD(token) {
   const u = sesiCek_(token);
-  if (!punyaAkses_(u, 'DINAS')) return [];
+  if (!punyaAkses_(u, 'DINAS') && !punyaAkses_(u, 'PTJ')) return [];
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
     (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });
@@ -1974,7 +1981,7 @@ function dataSpd_(nomor) {
 /** Daftar Surat Perintah Dinas yang masih OPEN (belum ada pertanggungjawaban). Semua admin bisa melihat. */
 function spdOpen(token) {
   const u0 = sesiCek_(token);
-  if (!punyaAkses_(u0, 'DINAS')) return [];
+  if (!punyaAkses_(u0, 'PTJ')) return [];
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Status Dinas'] || 'Aktif') !== 'Selesai')
     .map(r => dataSpd_(r['Nomor SPD']))
@@ -1990,7 +1997,7 @@ function spdOpen(token) {
  */
 function simpanPtjSPD(token, d) {
   const u = sesiCek_(token);
-  cekAkses_(u, 'DINAS');
+  cekAkses_(u, 'PTJ');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');
   let hasil;
