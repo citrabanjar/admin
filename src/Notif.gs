@@ -119,7 +119,7 @@ function bungkusEmail_(isi) {
 function tombol_(href, teks, warna) {
   return '<a href="' + href + '" style="display:inline-block;background:' + warna + ';color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;margin:4px 8px 4px 0">' + teks + '</a>';
 }
-function tabelDetail_(jenis, r, I, denganKompensasi) {
+function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
   const baris = jenis === 'SPL' ? [
     ['Nomor SPL', r['Nomor SPL']],
     ['Tanggal Lembur', r['Hari'] + ', ' + tglIndo_(r['Tanggal Lembur']) + ' (' + r['Status Hari'] + ')'],
@@ -141,7 +141,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
     ['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]   // Surat Perintah Dinas diperintahkan langsung oleh owner
-  ]);
+  ]).filter(b => !tanpaPersonel || ['Personel', 'Lama Tugas', 'Uang Saku'].indexOf(b[0]) < 0);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b =>
     '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' + escH_(b[0]) +
     '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
@@ -265,7 +265,8 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
         const ke = atasan ? atasan.email : I['Email Pembuat'];
         ubahBaris_(S, r._row, { 'Status': ST.ATASAN, 'Konfirmasi Pada': now,
           'Atasan': atasan ? atasan.nama : '(admin — atasan belum diisi)', 'Email Atasan': ke });
-        kirimPersetujuan_(jenis, S, r, I, atasan, ke);
+        if (jenis === 'SPD') ubahBaris_(S, r._row, { 'Status Email': 'Persetujuan menunggu personel lain (dikirim gabungan)' });
+        else kirimPersetujuan_(jenis, S, r, I, atasan, ke);
         logAksi_(jenis, nomor, 'BERSEDIA', r['Full Name'], 'Diteruskan ke ' + ke);
         pesan = 'Terima kasih. Kesediaan Anda sudah dicatat dan diteruskan ke ' + (atasan ? 'atasan (' + escH_(sdr_(atasan.nama)) + ')' : 'admin') + ' untuk persetujuan.' +
           (jenis === 'SPL' ? '</div>' + htmlInstruksiKantorku_() + '<div>' : '');
@@ -279,6 +280,9 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
     }
     SpreadsheetApp.flush();
   } finally { lock.releaseLock(); }
+  if (jenis === 'SPD' && tipe === 'k') {
+    try { antri_({ t: 'persetujuanDinas', nomor: nomor }); } catch (e) { logAksi_(jenis, nomor, 'EMAIL PERSETUJUAN GAGAL', '', String(e)); }
+  }
   try { antri_({ t: 'selesai', jenis: jenis, nomor: nomor }); } catch (e) { logAksi_(jenis, nomor, 'PDF GAGAL', '', String(e)); }
   return pesan;
 }
@@ -650,6 +654,53 @@ function kirimPersetujuan_(jenis, S, r, I, atasan, ke) {
   return err;
 }
 
+/**
+ * Email persetujuan Surat Perintah Dinas DIGABUNG per penyetuju.
+ * Personel dengan penyetuju yang sama ditunggu sampai semuanya menjawab konfirmasi
+ * (Bersedia / Tidak Bersedia), lalu dikirim SATU email berisi semua personel yang Bersedia —
+ * masing-masing dengan tombol Setujui / Tolak sendiri. Penyetuju berbeda → email terpisah.
+ * paksa = true (menu kirim ulang): kirim semua yang MENUNGGU ATASAN tanpa menunggu.
+ * Mengembalikan jumlah email yang dikirim.
+ */
+function kirimPersetujuanDinas_(nomor, paksa) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi.');
+  let n = 0;
+  try {
+    _K = null;
+    const J = JENIS.SPD, S = bacaBaris_('SPD');
+    const semua = S.rows.filter(x => x[J.kunci] === nomor);
+    if (!semua.length) return 0;
+    const grup = {};
+    semua.forEach(x => {
+      const a = penyetujuDinas_(x['Employee ID']), kunci = a ? a.id : '-';
+      (grup[kunci] = grup[kunci] || { a: a, rows: [] }).rows.push(x);
+    });
+    Object.values(grup).forEach(g => {
+      if (!paksa && g.rows.some(x => x['Status'] === ST.KONFIRMASI)) return;   // tunggu personel lain menjawab
+      const kirim = g.rows.filter(x => x['Status'] === ST.ATASAN && (paksa || !/^Persetujuan terkirim/.test(String(x['Status Email'] || ''))));
+      if (!kirim.length) return;
+      const I = induk_('SPD', nomor, kirim[0]), a = g.a, ke = a ? a.email : I['Email Pembuat'];
+      const th = 'padding:6px 8px;background:#F4F5F7;border:1px solid #E2E4E8;text-align:left', td = 'padding:6px 8px;border:1px solid #E2E4E8;vertical-align:top';
+      const isi = (a ? '<p>Yth. <b>' + escH_(sdr_(a.nama)) + '</b>,</p>' : '<p><i>Atasan karyawan belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
+        '<p>Personel berikut telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> melaksanakan perjalanan dinas. Mohon persetujuan Anda untuk masing-masing personel:</p>' +
+        tabelDetail_('SPD', kirim[0], I, false, true) +
+        '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="' + th + '">Personel</th><th style="' + th + '">Uang Saku</th><th style="' + th + '">Persetujuan</th></tr>' +
+        kirim.map(x => '<tr><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div style="font-size:11px;color:#6B6F76">' + escH_(x['Employee ID']) +
+          (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + ' · ' + escH_(x['Lama (hari)']) + ' hari' + (x['Keterangan'] ? ' — ' + escH_(x['Keterangan']) : '') + '</div></td>' +
+          '<td style="' + td + ';white-space:nowrap">' + rpH_(x['Uang Saku']) + '</td><td style="' + td + ';white-space:nowrap">' +
+          tombol_(linkAksi_(J.t, String(x['ID Baris']), 'ya'), '✅ Setujui', '#1E7B4A') + tombol_(linkAksi_(J.t, String(x['ID Baris']), 'tidak'), '❌ Tolak', '#B42318') + '</td></tr>').join('') +
+        '</table><p style="font-size:12px;color:#6B6F76">Uang saku dibayarkan melalui aplikasi KantorKu.</p>';
+      const err = kirimEmail_(ke, 'Persetujuan Dinas Luar — ' + (kirim.length > 1 ? kirim.length + ' personel' : sdr_(kirim[0]['Full Name'])) + ' (' + ringkasTanggal_('SPD', kirim[0], I) + ')', isi);
+      kirim.forEach(x => ubahBaris_(S, x._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') + (kirim.length > 1 ? ' (gabungan ' + kirim.length + ' personel)' : '') }));
+      logAksi_('SPD', nomor, err ? 'EMAIL PERSETUJUAN GAGAL' : 'EMAIL PERSETUJUAN TERKIRIM', ke, kirim.map(x => x['Full Name']).join(', ') + (err ? ' — ' + err : ''));
+      if (!err) n++;
+    });
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+  return n;
+}
+
 function menuKirimUlangKonfirmasi() {
   const ui = SpreadsheetApp.getUi();
   const r = ui.prompt('Kirim ulang email', 'Masukkan Nomor SPL / SPD. Email dikirim ulang ke karyawan yang MENUNGGU KONFIRMASI dan ke atasan untuk yang MENUNGGU ATASAN.', ui.ButtonSet.OK_CANCEL);
@@ -660,7 +711,8 @@ function menuKirimUlangKonfirmasi() {
   // kirim ulang juga permintaan persetujuan yang masih MENUNGGU ATASAN
   const J = JENIS[jenis], S = bacaBaris_(jenis);
   let nAtasan = 0;
-  S.rows.filter(x => x[J.kunci] === n && x['Status'] === ST.ATASAN).forEach(x => {
+  if (jenis === 'SPD') nAtasan = kirimPersetujuanDinas_(n, true);
+  else S.rows.filter(x => x[J.kunci] === n && x['Status'] === ST.ATASAN).forEach(x => {
     const I = induk_(jenis, n, x), atasan = jenis === 'SPD' ? penyetujuDinas_(x['Employee ID']) : cariAtasan_(x['Employee ID']);
     kirimPersetujuan_(jenis, S, x, I, atasan, atasan ? atasan.email : I['Email Pembuat']); nAtasan++;
   });
