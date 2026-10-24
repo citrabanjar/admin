@@ -230,7 +230,6 @@ function hitungSPD_(x, P) {
   }
   const per = (x.personel || []);
   if (per.length === 0) out.error.push('Minimal 1 personel.');
-  if (per.length > Number(P.MAKS_PERSONEL_SPD)) out.error.push('Maksimal ' + P.MAKS_PERSONEL_SPD + ' personel per SPD — buat SPD baru.');
   const ids = {};
   per.forEach((p, i) => {
     const lama = Number(p.lama);

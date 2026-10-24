@@ -163,7 +163,7 @@
         <button onclick="buka('spd')">
           <div class="ic">🚗</div>
           <div class="t">Surat Perintah Dinas</div>
-          <div class="d">Penugasan perjalanan dinas luar — maks. <span id="maksPers">5</span> personel per surat, uang saku & biaya dihitung otomatis.</div>
+          <div class="d">Penugasan perjalanan dinas luar — uang saku & biaya dihitung otomatis.</div>
         </button>
         <button onclick="buka('ptj')">
           <div class="ic">📋</div>
@@ -248,7 +248,7 @@
         </div>
       </div>
       <div class="card" style="padding:0">
-        <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan <span class="sub">(maks. <span id="dMaks">5</span> orang — bila lebih, buat surat baru)</span></div>
+        <div class="sek" style="padding:14px 16px 0">C. Personel yang Ditugaskan</div>
         <table class="mob">
           <thead><tr><th>No</th><th style="min-width:230px">Karyawan</th><th>Lama (hari)</th><th>Uang Saku</th><th style="min-width:180px">Keterangan</th><th></th></tr></thead>
           <tbody id="pRows"></tbody>
@@ -265,7 +265,7 @@
         <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="spdTambahBiaya()">+ Tambah biaya</button></div>
       </div>
       <div class="card">
-        <div class="total"><span>Total uang saku <span class="sub">(dibayar via KantorKu)</span></span><b id="tSaku">Rp 0</b></div>
+        <div class="total"><span>Total uang saku</span><b id="tSaku">Rp 0</b></div>
         <div class="total"><span>Total biaya lainnya</span><b id="tLain">Rp 0</b></div>
         <div class="total besar"><span>TOTAL BIAYA PERJALANAN DINAS</span><span id="tAll">Rp 0</span></div>
         <div class="total" style="margin-top:8px"><span>Uang kas dalam perjalanan</span><b id="tKas">Rp 0</b></div>
@@ -496,7 +496,6 @@ async function masukDengan(tok) {
   TOKEN = tok; simpanToken(tok);
   $('userNama').textContent = D.user.nama; $('userJab').textContent = D.user.jabatan + ' · ' + D.user.peran;
   $('userBox').classList.remove('hide');
-  $('maksPers').textContent = $('dMaks').textContent = D.P.MAKS_PERSONEL_SPD;
   splBaru(); spdBaru();
   tampil('vApp'); buka('home');
 }
@@ -635,8 +634,6 @@ function spdBaru() {
   spdTambahPersonel(); pesan('dErr'); hitungSPD();
 }
 function spdTambahPersonel() {
-  const maks = Number(D.P.MAKS_PERSONEL_SPD) || 5;
-  if (PROWS.length >= maks) { alert('Maksimal ' + maks + ' personel per surat — buat surat baru untuk personel berikutnya.'); return; }
   const id = ++uid, tr = document.createElement('tr'); tr.id = 'p' + id;
   tr.innerHTML =
     '<td class="n"></td>' +

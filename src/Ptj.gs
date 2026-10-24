@@ -163,8 +163,8 @@ function buatPdfPtj_(S, R) {
   const totRow = (lbl, span, nilai, sisa) => '<tr><td colspan="' + span + '" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + lbl +
     '</td><td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2;white-space:nowrap">' + nilai + '</td>' +
     (sisa ? '<td colspan="' + sisa + '" style="border:1px solid #BBB;background:#EFF0F2"></td>' : '') + '</tr>';
-  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
-    kopPdf_('LAPORAN PERTANGGUNGJAWABAN PERJALANAN DINAS', S.nomor) +
+  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}table.hal{width:100%;border-collapse:collapse}table.hal>thead{display:table-header-group}table.hal>thead>tr>td,table.hal>tbody>tr>td{padding:0}tr{page-break-inside:avoid}</style></head><body>' +
+    '<table class="hal"><thead><tr><td>' + kopPdf_('LAPORAN PERTANGGUNGJAWABAN PERJALANAN DINAS', S.nomor) + '</td></tr></thead><tbody><tr><td>' +
     sek('A. DATA SURAT PERINTAH DINAS') +
     kv([['Maksud / Tujuan', S.maksud, 'Tempat Tujuan', S.tempat],
         ['Rencana Berangkat', tg(S.berangkat), 'Rencana Kembali', tg(S.kembali)],
@@ -196,6 +196,6 @@ function buatPdfPtj_(S, R) {
     '<tr><td style="height:55px"></td><td></td><td></td></tr>' +
     '<tr><td>( ' + escH_(R.oleh) + ' )</td><td>(.........................)</td><td>(.........................)</td></tr>' +
     '<tr><td>Admin</td><td>Finance</td><td>HRD</td></tr></table>' +
-    '<p style="font-size:8px;color:#777;margin-top:8px">Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p></body></html>';
+    '<p style="font-size:8px;color:#777;margin-top:8px">Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p></td></tr></tbody></table></body></html>';
   return pdfDari_(html, 'Laporan Dinas ' + String(S.nomor).replace(/\s*\/\s*/g, '-') + '.pdf');
 }

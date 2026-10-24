@@ -581,8 +581,9 @@ function buatPdfSPD_(I, rows) {
   const kv = arr => '<table style="width:100%;font-size:10px;border-collapse:collapse">' + arr.map(r => '<tr>' + r.map((x, i) =>
     '<td style="padding:3px 4px;' + (i % 2 ? '' : 'width:110px;color:#555') + '">' + (i % 2 ? ': <b>' + escH_(x) + '</b>' : escH_(x)) + '</td>').join('') + '</tr>').join('') + '</table>';
   const tglB = I['Tgl Berangkat'], tglK = I['Tgl Kembali'];
-  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}</style></head><body>' +
-    kopPdf_('SURAT PERINTAH DINAS (SPD)', I['Nomor SPD']) +
+  // kop & nomor surat diulang di setiap halaman (thead tabel pembungkus)
+  const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}table.hal{width:100%;border-collapse:collapse}table.hal>thead{display:table-header-group}table.hal>thead>tr>td,table.hal>tbody>tr>td{padding:0}tr{page-break-inside:avoid}</style></head><body>' +
+    '<table class="hal"><thead><tr><td>' + kopPdf_('SURAT PERINTAH DINAS', I['Nomor SPD']) + '</td></tr></thead><tbody><tr><td>' +
     sek('A. REFERENSI SURAT') +
     kv([['Nomor Surat', I['No Surat Referensi'] || '-', 'Tanggal Surat', tglIndo_(I['Tanggal Surat'])], ['Nama Customer', I['Nama Customer'] || '-', 'Dasar Penugasan', I['Dasar Penugasan'] || '-']]) +
     sek('B. DETAIL PERJALANAN DINAS') +
@@ -619,7 +620,7 @@ function buatPdfSPD_(I, rows) {
     '<p style="text-align:right;font-size:10px;margin-top:12px">Dikeluarkan di : ' + (P.KOTA_SURAT ? escH_(P.KOTA_SURAT) + ', ' : '') + tglIndo_(I['Tanggal Surat']) + '</p>' +
     ttdPdf_(I['Dibuat Oleh'], 'Admin').replace('Manager Departemen', 'Manager Departemen') +
     '<p style="font-size:8px;color:#777;margin-top:8px">Konfirmasi personel dan persetujuan atasan dilakukan secara elektronik. Dokumen dibuat otomatis pada ' + waktuIndo_(new Date()) + '.</p>' +
-    '</body></html>';
+    '</td></tr></tbody></table></body></html>';
   return pdfDari_(html, 'SPD ' + String(I['Nomor SPD']).replace(/\s*\/\s*/g, '-') + ' (' + Utilities.formatDate(tglB, TZ, 'dd-MM-yyyy') + ').pdf');
 }
 
