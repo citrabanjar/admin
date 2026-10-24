@@ -1838,7 +1838,7 @@ function apiData_(q) {
       return keluar({ ok: true, kolom: head, baris: v.filter(r => String(r[0]).trim()).map(r => Object.fromEntries(pakai.map(i => [head[i], r[i] instanceof Date ? ymd_(r[i]) : r[i]]))) });
     }
     if (q.api === 'peran') return keluar({ ok: true, karyawan: Object.values(karyawan_()).filter(k => k.peran !== 'KARYAWAN' || isOwner_(k))
-      .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
+      .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, akses: k.akses, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
     return keluar({ ok: false, error: 'api tidak dikenal' });
   } catch (e) { return keluar({ ok: false, error: String(e.message || e) }); }
 }
