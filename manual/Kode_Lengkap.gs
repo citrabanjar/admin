@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V2';
+const CACHE_KARYAWAN = 'KARYAWAN_V3';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -103,7 +103,11 @@ function karyawan_() {
       email: String(r['Email'] || '').trim().toLowerCase(),
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
-      akses: String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),   // kosong = semua form
+      // akses form: kotak centang "Akses Lembur" / "Akses Dinas" (bila kolomnya ada), atau kolom teks lama "Akses Form" (kosong = semua)
+      aksesCek: ('Akses Lembur' in r) || ('Akses Dinas' in r),
+      akses: (('Akses Lembur' in r) || ('Akses Dinas' in r))
+        ? ['LEMBUR', 'DINAS'].filter(j => r['Akses ' + (j === 'LEMBUR' ? 'Lembur' : 'Dinas')] === true)
+        : String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
@@ -297,6 +301,7 @@ function sdr_(nama) {
 const DAFTAR_AKSES = ['LEMBUR', 'DINAS'];
 function punyaAkses_(k, jenis) {
   const a = (k && k.akses) || [];
+  if (k && k.aksesCek) return a.indexOf(jenis) >= 0;   // mode kotak centang: harus dicentang
   return !a.length || a.indexOf('SEMUA') >= 0 || a.indexOf(jenis) >= 0;
 }
 function cekAkses_(k, jenis) {
@@ -374,15 +379,26 @@ function setupAwal() {
     shK.getRange(1, col).setValue('Atasan').setFontWeight('bold')
        .setNote('Isi Employee ID atasan langsung (mis. D085). Atasan inilah yang menerima email persetujuan lembur.');
   }
-  // Kolom Akses Form: form apa saja yang boleh dibuka ADMIN (kosong = semua)
-  let colAkses = kolom_(SH.KARYAWAN)['Akses Form'];
-  if (!colAkses) {
-    colAkses = shK.getLastColumn() + 1;
-    shK.getRange(1, colAkses).setValue('Akses Form').setFontWeight('bold')
-       .setNote('Khusus ADMIN. Kosong = semua form. Isi LEMBUR, DINAS, atau "LEMBUR, DINAS" (pisahkan koma).');
-  }
-  shK.getRange(2, colAkses, shK.getMaxRows() - 1, 1).setDataValidation(
-    SpreadsheetApp.newDataValidation().requireValueInList(['LEMBUR', 'DINAS', 'LEMBUR, DINAS'], true).setAllowInvalid(true).build());
+  // Kolom akses form (kotak centang) — form apa saja yang boleh dibuka ADMIN
+  [['Akses Lembur', 'LEMBUR'], ['Akses Dinas', 'DINAS']].forEach(([judul, jenis]) => {
+    const c0 = kolom_(SH.KARYAWAN);
+    let col = c0[judul];
+    const baru = !col;
+    if (baru) { col = shK.getLastColumn() + 1; shK.getRange(1, col).setValue(judul).setFontWeight('bold').setNote('Centang bila ADMIN ini boleh membuka form ' + judul.replace('Akses ', '') + '.'); }
+    const n = shK.getMaxRows() - 1;
+    if (n < 1) return;
+    const rg = shK.getRange(2, col, n, 1);
+    if (baru) {   // nilai awal: ADMIN = dicentang (atau sesuai kolom lama "Akses Form" bila sudah diisi)
+      const v = shK.getRange(2, 1, n, shK.getLastColumn()).getValues(), c = kolom_(SH.KARYAWAN);   // baris kosong → false
+      rg.setValues(v.map(r => {
+        const peran = String(r[(c['Peran'] || 0) - 1] || '').trim().toUpperCase();
+        const lama = String(c['Akses Form'] ? r[c['Akses Form'] - 1] : '').toUpperCase();
+        return [peran === 'ADMIN' && (!lama.trim() || lama.indexOf(jenis) >= 0 || lama.indexOf('SEMUA') >= 0)];
+      }));
+    }
+    rg.setDataValidation(SpreadsheetApp.newDataValidation().requireCheckbox().build());   // tidak mengubah centang yang sudah ada
+  });
+  hapusCacheKaryawan_();
   // Parameter tambahan (dibuat bila belum ada)
   const shP = sheet_(SH.PARAM), adaP = shP.getRange(1, 1, Math.max(shP.getLastRow(), 1), 1).getValues().map(r => String(r[0]).trim());
   [['URL_WEB_APP', 'https://citrabanjar.github.io/admin/', 'Alamat form & link di email. Kosong = link Apps Script (script.google.com).'],

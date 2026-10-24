@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V2';
+const CACHE_KARYAWAN = 'KARYAWAN_V3';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -103,7 +103,11 @@ function karyawan_() {
       email: String(r['Email'] || '').trim().toLowerCase(),
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
-      akses: String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),   // kosong = semua form
+      // akses form: kotak centang "Akses Lembur" / "Akses Dinas" (bila kolomnya ada), atau kolom teks lama "Akses Form" (kosong = semua)
+      aksesCek: ('Akses Lembur' in r) || ('Akses Dinas' in r),
+      akses: (('Akses Lembur' in r) || ('Akses Dinas' in r))
+        ? ['LEMBUR', 'DINAS'].filter(j => r['Akses ' + (j === 'LEMBUR' ? 'Lembur' : 'Dinas')] === true)
+        : String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
@@ -297,6 +301,7 @@ function sdr_(nama) {
 const DAFTAR_AKSES = ['LEMBUR', 'DINAS'];
 function punyaAkses_(k, jenis) {
   const a = (k && k.akses) || [];
+  if (k && k.aksesCek) return a.indexOf(jenis) >= 0;   // mode kotak centang: harus dicentang
   return !a.length || a.indexOf('SEMUA') >= 0 || a.indexOf(jenis) >= 0;
 }
 function cekAkses_(k, jenis) {
