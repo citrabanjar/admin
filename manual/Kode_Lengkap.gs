@@ -1838,7 +1838,9 @@ function apiData_(q) {
       const spl = bacaTabel_(SH.SPL, 'Nomor SPL').slice(-15).map(r => [r['Nomor SPL'], t(r['Tanggal Lembur']), r['Employee ID'], r['Full Name'], r['Status'], r['Email Pembuat'],
         'pdf:' + (r['Link PDF'] ? 1 : 0) + ' owner:' + (r['Link PDF Owner'] ? 1 : 0) + ' atasan:' + (r['Link PDF Atasan'] ? 1 : 0), r['Status Email'],
         'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>'), 'owner:' + owner_().map(o => o.id).join(',')].join(' | '));
-      return keluar({ ok: true, log: log, spl: spl, kuota: MailApp.getRemainingDailyQuota() });
+      const spd = bacaTabel_(SH.PERSONEL, 'Nomor SPD').slice(-10).map(r => [r['Nomor SPD'], r['Employee ID'], r['Full Name'], r['Status'], r['Status Email'], t(r['Konfirmasi Pada']), r['Atasan'], r['Email Atasan'],
+        'penyetuju:' + ((penyetujuDinas_(r['Employee ID']) || {}).id || '-'), 'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>')].join(' | '));
+      return keluar({ ok: true, log: log, spl: spl, spd: spd, kuota: MailApp.getRemainingDailyQuota() });
     }
     if (q.api === 'antrian') { const P = PropertiesService.getScriptProperties(), d = Number(P.getProperty(ANTRIAN_DETAK) || 0);
       return keluar({ ok: true, aktif: antrianAktif_(), detakTerakhir: d ? Utilities.formatDate(new Date(d), TZ, 'dd/MM/yyyy HH:mm:ss') : '-', antrian: JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]').length }); }
