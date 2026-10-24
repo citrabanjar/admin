@@ -82,7 +82,7 @@ function peranDefault_(jabatan) {
 /** Master karyawan. Kolom wajib: Employee ID, Full Name, Job Position, Organization, Email.
  *  Opsional: Basic Salary, Departemen, Peran (kosong = KARYAWAN), Atasan (Employee ID atasan langsung),
  *            Aktif (YA/TIDAK) atau Status Employee (Resign/Keluar/Non Aktif = tidak aktif). */
-const CACHE_KARYAWAN = 'KARYAWAN_V4';
+const CACHE_KARYAWAN = 'KARYAWAN_V5';
 function hapusCacheKaryawan_() { try { CacheService.getScriptCache().remove(CACHE_KARYAWAN); } catch (e) {} _K = null; }
 function karyawan_() {
   if (_K) return _K;
@@ -104,10 +104,8 @@ function karyawan_() {
       peran: String(r['Peran'] || '').trim().toUpperCase() || peranDefault_(jab),
       atasan: String(r['Atasan'] || '').trim().toUpperCase(),   // Employee ID atasan langsung
       // akses form: kotak centang "Akses Lembur" / "Akses Dinas" (bila kolomnya ada), atau kolom teks lama "Akses Form" (kosong = semua)
-      aksesCek: KARTU.some(x => x.kolom in r),
-      akses: KARTU.some(x => x.kolom in r)
-        ? KARTU.filter(x => r[x.kolom] === true).map(x => x.kode)
-        : String(r['Akses Form'] || '').toUpperCase().split(/[\s,;\/+&]+/).filter(Boolean),
+      aksesCek: true,   // kolom "Akses Form": kartu yang dipilih saja (kosong = tidak ada akses)
+      akses: aksesDari_(r['Akses Form']),
       aktif: aktifKol ? aktifKol !== 'TIDAK' : !/resign|keluar|berhenti|non ?aktif|tidak aktif|phk/i.test(statusEmp)
     };
   });
@@ -300,10 +298,15 @@ function sdr_(nama) {
  *  Kosong / SEMUA = semua form.  Isi: LEMBUR, DINAS (boleh lebih dari satu, pisahkan koma). */
 /** Daftar kartu di Beranda form. Tambah kartu baru = tambah 1 baris di sini → Setup awal membuat kolom centangnya. */
 const KARTU = [
-  { kode: 'LEMBUR', kolom: 'Akses Lembur', nama: 'Surat Perintah Lembur' },
-  { kode: 'DINAS', kolom: 'Akses Dinas', nama: 'Surat Perintah Dinas' },
-  { kode: 'PTJ', kolom: 'Akses Pertanggungjawaban Dinas', nama: 'Pertanggungjawaban Dinas' }
+  { kode: 'LEMBUR', pilihan: 'LEMBUR', nama: 'Surat Perintah Lembur' },
+  { kode: 'DINAS', pilihan: 'DINAS', nama: 'Surat Perintah Dinas' },
+  { kode: 'PTJ', pilihan: 'PERTANGGUNGJAWABAN DINAS', nama: 'Pertanggungjawaban Dinas' }
 ];
+/** "LEMBUR, PERTANGGUNGJAWABAN DINAS" → ['LEMBUR','PTJ'] */
+function aksesDari_(teks) {
+  const t = String(teks || '').toUpperCase().split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+  return KARTU.filter(x => t.indexOf(x.pilihan) >= 0 || t.indexOf(x.kode) >= 0).map(x => x.kode);
+}
 const DAFTAR_AKSES = KARTU.map(x => x.kode);
 function punyaAkses_(k, jenis) {
   const a = (k && k.akses) || [];
