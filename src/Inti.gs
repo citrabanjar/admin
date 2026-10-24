@@ -298,14 +298,14 @@ function sdr_(nama) {
  *  Kosong / SEMUA = semua form.  Isi: LEMBUR, DINAS (boleh lebih dari satu, pisahkan koma). */
 /** Daftar kartu di Beranda form. Tambah kartu baru = tambah 1 baris di sini → Setup awal membuat kolom centangnya. */
 const KARTU = [
-  { kode: 'LEMBUR', pilihan: 'LEMBUR', nama: 'Surat Perintah Lembur' },
-  { kode: 'DINAS', pilihan: 'DINAS', nama: 'Surat Perintah Dinas' },
-  { kode: 'PTJ', pilihan: 'PERTANGGUNGJAWABAN DINAS', nama: 'Pertanggungjawaban Dinas' }
+  { kode: 'LEMBUR', pilihan: 'Lembur', nama: 'Surat Perintah Lembur', alias: [] },
+  { kode: 'DINAS', pilihan: 'Dinas', nama: 'Surat Perintah Dinas', alias: [] },
+  { kode: 'PTJ', pilihan: 'Res Dinas', nama: 'Pertanggungjawaban Dinas', alias: ['PERTANGGUNGJAWABAN DINAS', 'PERTANGGUNGJAWABAN', 'PTJ'] }
 ];
 /** "LEMBUR, PERTANGGUNGJAWABAN DINAS" → ['LEMBUR','PTJ'] */
 function aksesDari_(teks) {
   const t = String(teks || '').toUpperCase().split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
-  return KARTU.filter(x => t.indexOf(x.pilihan) >= 0 || t.indexOf(x.kode) >= 0).map(x => x.kode);
+  return KARTU.filter(x => [x.pilihan.toUpperCase(), x.kode].concat(x.alias || []).some(a => t.indexOf(a) >= 0)).map(x => x.kode);
 }
 const DAFTAR_AKSES = KARTU.map(x => x.kode);
 function punyaAkses_(k, jenis) {
