@@ -1097,7 +1097,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi) {
   ].concat(Number(I['Uang Kas Perjalanan']) ? [['Uang Kas Perjalanan', rpH_(I['Uang Kas Perjalanan']) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
-    ['Diperintahkan oleh', sdr_(namaAtasan_(r['Employee ID']) || I['Dibuat Oleh'])]
+    ['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]   // Surat Perintah Dinas diperintahkan langsung oleh owner
   ]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b =>
     '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' + escH_(b[0]) +
@@ -1218,7 +1218,7 @@ function prosesAksi(aksi, id, sig, jawaban, alasan) {
         logAksi_(jenis, nomor, 'TIDAK BERSEDIA', r['Full Name'], alas);
         pesan = 'Terima kasih. Ketidaksediaan Anda sudah dicatat dan diberitahukan ke admin.';
       } else {
-        const atasan = cariAtasan_(r['Employee ID']);
+        const atasan = jenis === 'SPD' ? penyetujuDinas_(r['Employee ID']) : cariAtasan_(r['Employee ID']);   // dinas: 1 level di bawah owner
         const ke = atasan ? atasan.email : I['Email Pembuat'];
         ubahBaris_(S, r._row, { 'Status': ST.ATASAN, 'Konfirmasi Pada': now,
           'Atasan': atasan ? atasan.nama : '(admin — atasan belum diisi)', 'Email Atasan': ke });
@@ -1258,6 +1258,14 @@ function rantaiAtasan_(employeeId) {
   let a = cariAtasan_(employeeId);
   while (a && !isOwner_(a) && !lihat[a.id]) { lihat[a.id] = 1; out.push(a); a = cariAtasan_(a.id); }
   return out;
+}
+/** Penyetuju Surat Perintah Dinas: atasan tertinggi di rantai karyawan, tepat 1 level di bawah owner.
+ *  Bila atasan langsung karyawan adalah owner (atau karyawan sendiri 1 level di bawah owner) → owner yang menyetujui. */
+function penyetujuDinas_(employeeId) {
+  const rantai = rantaiAtasan_(employeeId);
+  if (rantai.length) return rantai[rantai.length - 1];
+  const a = cariAtasan_(employeeId);
+  return a || null;
 }
 /** Owner (BOSS): karyawan aktif ber-email yang kolom Atasan-nya = BOSS (atau Peran / Employee ID = BOSS) */
 function owner_() {
