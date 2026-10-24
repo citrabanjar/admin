@@ -241,7 +241,7 @@ window.SERVER={
       <h2 class="judul">SURAT PERINTAH DINAS</h2>
       <div class="card">
         <div class="sek">A. Referensi Surat</div>
-        <div class="row">
+        <div class="row" style="align-items:flex-start">
           <div><label>Nomor Surat Referensi</label><input id="dRef" placeholder="mis. SO-2026-001 / SPK-015"><div class="sub" style="margin-top:4px">Diisi dengan nomor surat dari customer, contoh: Sales Order / SPK / Surat Lainnya</div></div>
           <div style="max-width:200px"><label>Tanggal Surat *</label><input id="dTglSurat" type="date" onchange="hitungSPD()"></div>
         </div>
@@ -284,18 +284,9 @@ window.SERVER={
         </table>
         <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="spdTambahPersonel()">+ Tambah personel</button></div>
       </div>
-      <div class="card" style="padding:0">
-        <div class="sek" style="padding:14px 16px 0">D. Biaya Perjalanan Dinas Lainnya</div>
-        <table class="mob">
-          <thead><tr><th>No</th><th style="min-width:170px">Jenis Biaya</th><th style="min-width:200px">Uraian</th><th style="min-width:130px">Jumlah (Rp)</th><th>Bukti</th><th></th></tr></thead>
-          <tbody id="bRows"></tbody>
-        </table>
-        <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="spdTambahBiaya()">+ Tambah biaya</button></div>
-      </div>
       <div class="card">
         <div class="total"><span>Total uang saku</span><b id="tSaku">Rp 0</b></div>
-        <div class="total"><span>Total biaya lainnya</span><b id="tLain">Rp 0</b></div>
-        <div class="total besar"><span>TOTAL BIAYA PERJALANAN DINAS</span><span id="tAll">Rp 0</span></div>
+        <span id="tLain" class="hide"></span><span id="tAll" class="hide"></span>
         <div class="total" style="margin-top:8px"><span>Uang kas dalam perjalanan</span><b id="tKas">Rp 0</b></div>
       </div>
       <div id="dErr"></div>
@@ -765,7 +756,7 @@ function spdBaru() {
   $('dDasar').innerHTML = opsi(D.pilihan.dasarPenugasan, '', '— pilih —');
   $('dTrans').innerHTML = opsi(D.pilihan.transportasi, '', '— pilih —');
   $('dSumber').innerHTML = opsi(D.pilihan.sumberBiaya, '', '— pilih —');
-  PROWS = []; BROWS = []; $('pRows').innerHTML = ''; $('bRows').innerHTML = '';
+  PROWS = []; BROWS = []; $('pRows').innerHTML = '';
   spdTambahPersonel(); pesan('dErr'); hitungSPD();
 }
 function spdTambahPersonel() {
@@ -875,7 +866,7 @@ function spdKonfirmasi() {
   if (!SPD_OK) { if (umum.length) pesan('dErr', 'err', umum.map(esc).join('<br>')); return; }
   const d = spdData();
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Dinas</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
-    '<br><b>' + d.personel.length + '</b> personel · total <b>' + $('tAll').textContent + '</b><br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p>' +
+    '<br><b>' + d.personel.length + '</b> personel · uang saku <b>' + $('tSaku').textContent + '</b><br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="spdKirim()">Ya, kirim</button></div>');
 }
 async function spdKirim() {

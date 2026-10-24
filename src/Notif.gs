@@ -606,14 +606,16 @@ function buatPdfSPD_(I, rows) {
       tdP_(r['Lama (hari)'], 'text-align:center') + tdP_(rpH_(r['Uang Saku']), 'text-align:right') + tdP_(escH_(r['Keterangan'])) + tdP_(selStatus_(r)) + tdP_(selAtasan_(r)) + '</tr>').join('') +
     '<tr><td colspan="5" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL UANG SAKU PERSONEL DISETUJUI (' + setuju.length + ' dari ' + rows.length + ' orang)</td>' +
     '<td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + rpH_(totSaku) + '</td><td colspan="3" style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
+    (biaya.length ? (   // biaya lainnya kini diisi di Pertanggungjawaban Dinas; tampil hanya untuk surat lama yang punya rencana biaya
     sek('D. BIAYA PERJALANAN DINAS LAINNYA') +
     (biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
       biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b['Jenis Biaya'])) + tdP_(escH_(b['Uraian'])) + tdP_(rpH_(b['Jumlah (Rp)']), 'text-align:right') + tdP_(escH_(b['Bukti']), 'text-align:center') + '</tr>').join('') +
       '<tr><td colspan="3" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL BIAYA LAINNYA</td><td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + rpH_(totLain) + '</td><td style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>'
       : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
     '<table style="width:100%;margin-top:6px;border-collapse:collapse"><tr><td style="padding:6px;border:2px solid #BE353F;font-weight:bold;font-size:11px">TOTAL BIAYA PERJALANAN DINAS (Uang Saku disetujui + Biaya Lainnya)</td>' +
-    '<td style="padding:6px;border:2px solid #BE353F;font-weight:bold;font-size:11px;text-align:right;width:130px;color:#BE353F">' + rpH_(totSaku + totLain) + '</td></tr></table>' +
-    sek('E. KETENTUAN') +
+    '<td style="padding:6px;border:2px solid #BE353F;font-weight:bold;font-size:11px;text-align:right;width:130px;color:#BE353F">' + rpH_(totSaku + totLain) + '</td></tr></table>'
+    ) : '') +
+    sek((biaya.length ? 'E' : 'D') + '. KETENTUAN') +
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
     '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +
     '<li>Selama tanggal dinas luar tidak dapat diajukan lembur; pengajuan lembur pada tanggal tersebut akan ditolak.</li>' +
@@ -621,7 +623,7 @@ function buatPdfSPD_(I, rows) {
     '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) = uang kas yang harus dikembalikan.</li>' +
     '<li>Mintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan sebagai bukti kehadiran.</li>' +
     '<li>Laporan perjalanan dinas beserta bukti pengeluaran diserahkan ke Admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
-    sek('F. PENGESAHAN DI TEMPAT TUJUAN') +
+    sek((biaya.length ? 'F' : 'E') + '. PENGESAHAN DI TEMPAT TUJUAN') +
     '<table style="width:100%;border-collapse:collapse;font-size:9px"><tr>' + ['TIBA DI TEMPAT TUJUAN', 'BERANGKAT DARI TEMPAT TUJUAN'].map(t =>
       '<td style="width:50%;border:1px solid #BBB;padding:6px;vertical-align:top"><b>' + t + '</b><br><br>Tempat : ............................<br><br>Tanggal : ............................<br><br>Jam : ............................' +
       '<div style="height:50px"></div><div style="text-align:center;color:#555">( Nama, Tanda Tangan & Stempel Instansi )</div></td>').join('') + '</tr></table>' +
