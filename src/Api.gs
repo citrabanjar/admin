@@ -50,6 +50,7 @@ function apiData_(q) {
         'pdf:' + (r['Link PDF'] ? 1 : 0) + ' owner:' + (r['Link PDF Owner'] ? 1 : 0) + ' atasan:' + (r['Link PDF Atasan'] ? 1 : 0), r['Status Email'],
         'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>'), 'owner:' + owner_().map(o => o.id).join(',')].join(' | '));
       const spd = bacaTabel_(SH.PERSONEL, 'Nomor SPD').slice(-10).map(r => [r['Nomor SPD'], r['Employee ID'], r['Full Name'], r['Status'], r['Status Email'], t(r['Konfirmasi Pada']), r['Atasan'], r['Email Atasan'],
+        'email:' + String((karyawan_()[String(r['Employee ID']).toUpperCase()] || {}).email || '-').replace(/^(.{3}).*(@.*)$/, '$1•••$2'),
         'penyetuju:' + ((penyetujuDinas_(r['Employee ID']) || {}).id || '-'), 'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>')].join(' | '));
       return keluar({ ok: true, log: log, spl: spl, spd: spd, kuota: MailApp.getRemainingDailyQuota() });
     }

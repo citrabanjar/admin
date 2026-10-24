@@ -1129,7 +1129,7 @@ function kirimKonfirmasi_(jenis, nomor) {
       tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
     const err = kirimEmail_(keAdmin ? Ir['Email Pembuat'] : k.email,
       'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + sdr_(r['Full Name']) : ''), isi);
-    ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ' + (keAdmin ? 'ke admin ' : '') + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+    ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ke ' + (keAdmin ? 'admin ' : '') + (keAdmin ? Ir['Email Pembuat'] : k.email) + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
   });
 }
 function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
@@ -1839,6 +1839,7 @@ function apiData_(q) {
         'pdf:' + (r['Link PDF'] ? 1 : 0) + ' owner:' + (r['Link PDF Owner'] ? 1 : 0) + ' atasan:' + (r['Link PDF Atasan'] ? 1 : 0), r['Status Email'],
         'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>'), 'owner:' + owner_().map(o => o.id).join(',')].join(' | '));
       const spd = bacaTabel_(SH.PERSONEL, 'Nomor SPD').slice(-10).map(r => [r['Nomor SPD'], r['Employee ID'], r['Full Name'], r['Status'], r['Status Email'], t(r['Konfirmasi Pada']), r['Atasan'], r['Email Atasan'],
+        'email:' + String((karyawan_()[String(r['Employee ID']).toUpperCase()] || {}).email || '-').replace(/^(.{3}).*(@.*)$/, '$1•••$2'),
         'penyetuju:' + ((penyetujuDinas_(r['Employee ID']) || {}).id || '-'), 'rantai:' + rantaiAtasan_(r['Employee ID']).map(a => a.id).join('>')].join(' | '));
       return keluar({ ok: true, log: log, spl: spl, spd: spd, kuota: MailApp.getRemainingDailyQuota() });
     }

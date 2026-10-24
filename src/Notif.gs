@@ -172,7 +172,7 @@ function kirimKonfirmasi_(jenis, nomor) {
       tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
     const err = kirimEmail_(keAdmin ? Ir['Email Pembuat'] : k.email,
       'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + sdr_(r['Full Name']) : ''), isi);
-    ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ' + (keAdmin ? 'ke admin ' : '') + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+    ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ke ' + (keAdmin ? 'admin ' : '') + (keAdmin ? Ir['Email Pembuat'] : k.email) + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
   });
 }
 function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
