@@ -1093,7 +1093,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
     ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
-    ['Uang Saku', rpH_(r['Uang Saku']) + ' (dibayarkan melalui aplikasi KantorKu)'],
+    ['Uang Saku', rpH_(r['Uang Saku'])],
   ].concat(Number(I['Uang Kas Perjalanan']) ? [['Uang Kas Perjalanan', rpH_(I['Uang Kas Perjalanan']) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
@@ -1136,7 +1136,8 @@ function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
 
 /* ======================= Halaman aksi (link dari email) ======================= */
 function halamanAksi_(p) {
-  if (p.a === 'b') return halamanBatal_(p);   // pembatalan lembur oleh atasan / owner (Batal.gs)
+  if (p.a === 'b') return halamanBatal_(p);
+  if (p.a === 'dg') return halamanGrupDinas_(p);   // pembatalan lembur oleh atasan / owner (Batal.gs)
   const aksi = p.a, id = p.id, sig = p.s;
   let isi;
   try {
@@ -1170,6 +1171,65 @@ function halamanAksi_(p) {
   }
   return halamanHtml_(isi);
 }
+/** Persetujuan gabungan Surat Perintah Dinas: 1 tombol untuk seluruh karyawan di email. id = 'IDBaris.IDBaris...' */
+function barisGrup_(id) {
+  const ids = String(id || '').split('.').filter(Boolean), S = bacaBaris_('SPD');
+  return { S: S, rows: ids.map(i => S.rows.find(x => String(x['ID Baris']) === i)).filter(Boolean) };
+}
+function halamanGrupDinas_(p) {
+  let isi;
+  try {
+    if (!p.id || p.s !== tandaTangan_('dg', p.id)) throw new Error('Link tidak valid atau sudah diubah.');
+    const G = barisGrup_(p.id), r0 = G.rows[0];
+    if (!r0) throw new Error('Data tidak ditemukan (mungkin sudah dihapus).');
+    const I = induk_('SPD', r0['Nomor SPD'], r0), td = 'padding:6px;border-top:1px solid #eee';
+    const aktif = G.rows.filter(x => x['Status'] === ST.ATASAN);
+    isi = '<h2>Persetujuan Dinas Luar</h2>' + tabelDetail_('SPD', r0, I, false, true).replace(/width:150px/g, 'width:130px') +
+      '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="text-align:left;padding:6px;background:#F4F5F7">Nama Karyawan</th><th style="padding:6px;background:#F4F5F7">Status</th></tr>' +
+      G.rows.map(x => '<tr><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div class="sub">' + escH_(x['Employee ID']) + (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') +
+        ' · ' + rpH_(x['Uang Saku']) + '</div></td><td style="' + td + ';font-size:11px;text-align:center">' + escH_(x['Status']) + '</td></tr>').join('') + '</table>';
+    if (!aktif.length) {
+      isi += '<div class="msg info">Sudah diproses seluruhnya.</div>';
+    } else {
+      const pil = p.p === 'tidak' ? 'tidak' : 'ya';
+      isi += '<div class="pilih">' +
+        '<label class="op ya"><input type="radio" name="j" value="ya"' + (pil === 'ya' ? ' checked' : '') + '> ✅ Setujui</label>' +
+        '<label class="op tidak"><input type="radio" name="j" value="tidak"' + (pil === 'tidak' ? ' checked' : '') + '> ❌ Tolak</label></div>' +
+        '<div id="al"><label>Catatan <span class="sub">(opsional)</span></label><textarea id="alasan" rows="3"></textarea></div>' +
+        '<button id="b" onclick="kirim()">Kirim</button><div id="o"></div>' +
+        '<script>function kirim(){var b=document.getElementById("b"),o=document.getElementById("o");b.disabled=true;b.textContent="Mengirim…";' +
+        'google.script.run.withSuccessHandler(function(m){document.querySelector(".pilih").remove();document.getElementById("al").remove();b.remove();o.innerHTML="<div class=\\"msg ok\\">"+m+"</div>"})' +
+        '.withFailureHandler(function(e){b.disabled=false;b.textContent="Kirim";o.innerHTML="<div class=\\"msg err\\">"+e.message+"</div>"})' +
+        '.prosesGrupDinas(' + JSON.stringify(String(p.id)) + ',' + JSON.stringify(p.s) + ',document.querySelector("input[name=j]:checked").value,document.getElementById("alasan").value)}</script>';
+    }
+  } catch (e) {
+    isi = '<h2>Tidak dapat dibuka</h2><div class="msg err">' + escH_(e.message) + '</div>';
+  }
+  return halamanHtml_(isi);
+}
+/** Dipanggil dari halaman persetujuan gabungan dinas. */
+function prosesGrupDinas(id, sig, jawaban, alasan) {
+  if (!id || sig !== tandaTangan_('dg', id)) throw new Error('Link tidak valid.');
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi.');
+  let nomor, kena;
+  const setuju = jawaban !== 'tidak', alas = String(alasan || '').trim().slice(0, 500), now = new Date();
+  try {
+    _K = null; _P = null;
+    pastikanKolom_(JENIS.SPD.sheet, JENIS.SPD.tambahan);
+    const G = barisGrup_(id);
+    if (!G.rows.length) throw new Error('Data tidak ditemukan.');
+    nomor = G.rows[0]['Nomor SPD'];
+    kena = G.rows.filter(x => x['Status'] === ST.ATASAN);
+    if (!kena.length) return 'Sudah diproses sebelumnya.';
+    kena.forEach(r => ubahBaris_(G.S, r._row, { 'Status': setuju ? ST.SETUJU : ST.TOLAK, 'Disetujui Oleh': r['Atasan'], 'Disetujui Pada': now, 'Catatan Atasan': alas }));
+    logAksi_('SPD', nomor, setuju ? 'DISETUJUI ATASAN' : 'DITOLAK ATASAN', kena[0]['Email Atasan'], kena.map(r => r['Full Name']).join(', ') + (alas ? ' — ' + alas : ''));
+    SpreadsheetApp.flush();
+  } finally { lock.releaseLock(); }
+  try { antri_({ t: 'selesai', jenis: 'SPD', nomor: nomor }); } catch (e) { logAksi_('SPD', nomor, 'PDF GAGAL', '', String(e)); }
+  return 'Terima kasih. Dinas luar ' + kena.length + ' karyawan (' + kena.map(r => escH_(sdr_(r['Full Name']))).join(', ') + ') telah <b>' + (setuju ? 'DISETUJUI' : 'DITOLAK') + '</b>.';
+}
+
 function halamanHtml_(isi) {
   const html = '<!DOCTYPE html><html><head><base target="_top"><meta charset="utf-8"><style>' +
     'body{margin:0;font-family:Arial,sans-serif;font-size:14px;background:#F5F5F6;color:#222}' +
@@ -1314,6 +1374,19 @@ function cekSelesai_(jenis, nomor, paksa) {
   const pembuat = String(I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, 'PDF ' + jenis + ' ' + nomor + ' — ' + ringkasTanggal_(jenis, rows[0], I), isi, admin && admin !== pembuat ? admin : '', pdf);
   logAksi_(jenis, nomor, 'PDF DIKIRIM', pembuat, file.getUrl());
+  if (jenis === 'SPD' && !belum.length) {   // surat final → PDF dikirim ke tiap karyawan yang disetujui
+    const K = karyawan_();
+    ok.forEach(r => {
+      const k = K[String(r['Employee ID']).toUpperCase()];
+      if (!k || !k.email) return;
+      const err = kirimEmail_(k.email, 'Surat Perintah Dinas ' + nomor + ' — ' + ringkasTanggal_(jenis, r, I),
+        '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Perjalanan dinas Anda telah <b style="color:#1E7B4A">DISETUJUI</b>. ' +
+        'Terlampir Surat Perintah Dinas yang dapat dicetak sekarang atau nanti, untuk dimintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan.</p>' +
+        tabelDetail_('SPD', r, I), '', pdf);
+      ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim PDF: ' + err : 'PDF surat terkirim ke ' + k.email + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+    });
+    logAksi_(jenis, nomor, 'PDF KE KARYAWAN', '', ok.length + ' karyawan');
+  }
   return 'PDF dibuat & dikirim ke ' + pembuat;
 }
 function cekSelesaiSPL_(nomor, paksa) { return cekSelesai_('SPL', nomor, paksa); }
@@ -1539,7 +1612,7 @@ function ttdPdf_(nama, jabatan) {   // nama null → tanpa kolom "Dibuat oleh" (
 function buatPdfSPD_(I, rows) {
   const P = param_();
   const biaya = bacaTabel_(SH.BIAYA, 'Nomor SPD').filter(b => b['Nomor SPD'] === I['Nomor SPD']);
-  const setuju = rows.filter(r => r['Status'] === ST.SETUJU);
+  const setuju = rows.filter(r => [ST.TIDAK, ST.TOLAK, ST.BATAL].indexOf(r['Status']) < 0);   // personel yang tidak bersedia / ditolak tidak dicantumkan
   const totSaku = setuju.reduce((s, r) => s + (Number(r['Uang Saku']) || 0), 0);
   const totLain = biaya.reduce((s, b) => s + (Number(b['Jumlah (Rp)']) || 0), 0);
   const sek = t => '<div style="background:#3A3A3A;color:#fff;font-weight:bold;font-size:10px;padding:4px 6px;margin:10px 0 4px">' + t + '</div>';
@@ -1558,11 +1631,11 @@ function buatPdfSPD_(I, rows) {
         ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
         ['Uang Kas Perjalanan', rpH_(Number(I['Uang Kas Perjalanan']) || 0)]]) +
     sek('C. PERSONEL YANG DITUGASKAN') +
-    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Uang Saku', 'Keterangan', 'Status', 'Persetujuan Atasan'].map(thP_).join('') + '</tr>' +
-    rows.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
-      tdP_(r['Lama (hari)'], 'text-align:center') + tdP_(rpH_(r['Uang Saku']), 'text-align:right') + tdP_(escH_(r['Keterangan'])) + tdP_(selStatus_(r)) + tdP_(selAtasan_(r)) + '</tr>').join('') +
-    '<tr><td colspan="5" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL UANG SAKU PERSONEL DISETUJUI (' + setuju.length + ' dari ' + rows.length + ' orang)</td>' +
-    '<td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + rpH_(totSaku) + '</td><td colspan="3" style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
+    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Uang Saku', 'Keterangan'].map(thP_).join('') + '</tr>' +
+    setuju.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
+      tdP_(r['Lama (hari)'], 'text-align:center') + tdP_(rpH_(r['Uang Saku']), 'text-align:right') + tdP_(escH_(r['Keterangan'])) + '</tr>').join('') +
+    '<tr><td colspan="5" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL UANG SAKU (' + setuju.length + ' orang)</td>' +
+    '<td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + rpH_(totSaku) + '</td><td style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
     (biaya.length ? (   // biaya lainnya kini diisi di Pertanggungjawaban Dinas; tampil hanya untuk surat lama yang punya rencana biaya
     sek('D. BIAYA PERJALANAN DINAS LAINNYA') +
     (biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
@@ -1576,7 +1649,7 @@ function buatPdfSPD_(I, rows) {
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
     '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +
     '<li>Selama tanggal dinas luar tidak dapat diajukan lembur; pengajuan lembur pada tanggal tersebut akan ditolak.</li>' +
-    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari) dan dibayarkan melalui aplikasi KantorKu.</li>' +
+    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari).</li>' +
     '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) = uang kas yang harus dikembalikan.</li>' +
     '<li>Mintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan sebagai bukti kehadiran.</li>' +
     '<li>Laporan perjalanan dinas beserta bukti pengeluaran diserahkan ke Admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
@@ -1640,14 +1713,14 @@ function kirimPersetujuanDinas_(nomor, paksa) {
       const I = induk_('SPD', nomor, kirim[0]), a = g.a, ke = a ? a.email : I['Email Pembuat'];
       const th = 'padding:6px 8px;background:#F4F5F7;border:1px solid #E2E4E8;text-align:left', td = 'padding:6px 8px;border:1px solid #E2E4E8;vertical-align:top';
       const isi = (a ? '<p>Yth. <b>' + escH_(sdr_(a.nama)) + '</b>,</p>' : '<p><i>Atasan karyawan belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
-        '<p>Personel berikut telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> melaksanakan perjalanan dinas. Mohon persetujuan Anda untuk masing-masing personel:</p>' +
+        '<p>Personel berikut telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> melaksanakan perjalanan dinas. Mohon persetujuan Anda:</p>' +
         tabelDetail_('SPD', kirim[0], I, false, true) +
-        '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="' + th + '">Personel</th><th style="' + th + '">Uang Saku</th><th style="' + th + '">Persetujuan</th></tr>' +
-        kirim.map(x => '<tr><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div style="font-size:11px;color:#6B6F76">' + escH_(x['Employee ID']) +
+        '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="' + th + '">No</th><th style="' + th + '">Nama Karyawan</th><th style="' + th + '">Uang Saku</th></tr>' +
+        kirim.map((x, i) => '<tr><td style="' + td + ';text-align:center">' + (i + 1) + '</td><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div style="font-size:11px;color:#6B6F76">' + escH_(x['Employee ID']) +
           (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + ' · ' + escH_(x['Lama (hari)']) + ' hari' + (x['Keterangan'] ? ' — ' + escH_(x['Keterangan']) : '') + '</div></td>' +
-          '<td style="' + td + ';white-space:nowrap">' + rpH_(x['Uang Saku']) + '</td><td style="' + td + ';white-space:nowrap">' +
-          tombol_(linkAksi_(J.t, String(x['ID Baris']), 'ya'), '✅ Setujui', '#1E7B4A') + tombol_(linkAksi_(J.t, String(x['ID Baris']), 'tidak'), '❌ Tolak', '#B42318') + '</td></tr>').join('') +
-        '</table><p style="font-size:12px;color:#6B6F76">Uang saku dibayarkan melalui aplikasi KantorKu.</p>';
+          '<td style="' + td + ';white-space:nowrap">' + rpH_(x['Uang Saku']) + '</td></tr>').join('') + '</table>' +
+        '<p style="margin-top:18px">' + tombol_(linkAksi_('dg', kirim.map(x => x['ID Baris']).join('.'), 'ya'), '✅ Setujui', '#1E7B4A') +
+        tombol_(linkAksi_('dg', kirim.map(x => x['ID Baris']).join('.'), 'tidak'), '❌ Tolak', '#B42318') + '</p>';
       const err = kirimEmail_(ke, 'Persetujuan Dinas Luar — ' + (kirim.length > 1 ? kirim.length + ' personel' : sdr_(kirim[0]['Full Name'])) + ' (' + ringkasTanggal_('SPD', kirim[0], I) + ')', isi);
       kirim.forEach(x => ubahBaris_(S, x._row, { 'Status Email': err ? 'GAGAL kirim ke atasan: ' + err : 'Persetujuan terkirim ke ' + ke + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') + (kirim.length > 1 ? ' (gabungan ' + kirim.length + ' personel)' : '') }));
       logAksi_('SPD', nomor, err ? 'EMAIL PERSETUJUAN GAGAL' : 'EMAIL PERSETUJUAN TERKIRIM', ke, kirim.map(x => x['Full Name']).join(', ') + (err ? ' — ' + err : ''));
