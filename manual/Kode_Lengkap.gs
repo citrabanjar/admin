@@ -1374,21 +1374,21 @@ function cekSelesai_(jenis, nomor, paksa) {
   const pembuat = String(I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, 'PDF ' + jenis + ' ' + nomor + ' — ' + ringkasTanggal_(jenis, rows[0], I), isi, admin && admin !== pembuat ? admin : '', pdf);
   logAksi_(jenis, nomor, 'PDF DIKIRIM', pembuat, file.getUrl());
-  if (jenis === 'SPD' && !belum.length) {   // surat final → PDF dikirim ke tiap karyawan yang disetujui
-    const K = karyawan_();
-    ok.forEach(r => {
+  if (jenis === 'SPD' && !belum.length) {   // surat final → PDF dikirim ke SATU karyawan per rombongan (penyetuju sama)
+    const K = karyawan_(), grup = {};
+    ok.forEach(r => { const a = penyetujuDinas_(r['Employee ID']), g = a ? a.id : '-'; (grup[g] = grup[g] || []).push(r); });
+    Object.values(grup).forEach(tim => {
+      const r = tim.find(x => (K[String(x['Employee ID']).toUpperCase()] || {}).email);
+      if (!r) return;
       const k = K[String(r['Employee ID']).toUpperCase()];
-      if (!k || !k.email) return;
-      // tanpa lampiran PDF (lampiran dari domain baru sering ditolak Gmail) — karyawan diberi akses lihat file di Drive
-      let akses = '';
-      try { Drive.Permissions.create({ role: 'reader', type: 'user', emailAddress: k.email }, file.getId(), { sendNotificationEmail: false }); } catch (e) {   // tanpa email notifikasi "shared with you"
-        akses = String(e); logAksi_(jenis, nomor, 'AKSES PDF GAGAL', k.email, akses); }
+      const daftar = tim.length > 1 ? '<p>Surat ini berlaku untuk seluruh tim:</p><ol>' + tim.map(x => '<li><b>' + escH_(sdr_(x['Full Name'])) + '</b>' +
+        (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + '</li>').join('') + '</ol>' : '';
       const err = kirimEmail_(k.email, 'Surat Perintah Dinas ' + nomor + ' — ' + ringkasTanggal_(jenis, r, I),
-        '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Perjalanan dinas Anda telah <b style="color:#1E7B4A">DISETUJUI</b>.</p>' +
-        tabelDetail_('SPD', r, I) + '<p style="margin-top:18px">' + tombol_(file.getUrl(), '📄 Surat Perintah Dinas (PDF)', '#BE353F') + '</p>');
-      ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim PDF: ' + err : 'PDF surat terkirim ke ' + k.email + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+        '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Perjalanan dinas ' + (tim.length > 1 ? 'tim Anda' : 'Anda') + ' telah <b style="color:#1E7B4A">DISETUJUI</b>. Terlampir Surat Perintah Dinas.</p>' +
+        tabelDetail_('SPD', r, I, false, tim.length > 1) + daftar, '', pdf);
+      tim.forEach(x => ubahBaris_(S, x._row, { 'Status Email': err ? 'GAGAL kirim PDF: ' + err : 'PDF surat terkirim ke ' + k.email + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') }));
+      logAksi_(jenis, nomor, err ? 'PDF KE KARYAWAN GAGAL' : 'PDF KE KARYAWAN', k.email, tim.map(x => x['Full Name']).join(', ') + (err ? ' — ' + err : ''));
     });
-    logAksi_(jenis, nomor, 'PDF KE KARYAWAN', '', ok.length + ' karyawan');
   }
   return 'PDF dibuat & dikirim ke ' + pembuat;
 }
