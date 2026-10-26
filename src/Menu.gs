@@ -25,6 +25,7 @@ function onOpen() {
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')
+    .addItem('🧪 Tes pengiriman email (diagnosa bounce)', 'menuTesEmail')
     .addToUi();
 }
 
@@ -211,4 +212,31 @@ function lihatNomorBerikutnya() {
   const hari = new Date();
   SpreadsheetApp.getUi().alert('Nomor berikutnya (tanggal hari ini):\n\nSPL : ' + nomorBerikutnya_('SPL', hari) +
     '\nSPD : ' + nomorBerikutnya_('SPD', hari));
+}
+
+/**
+ * Diagnosa penolakan Gmail: kirim 5 variasi email ke 1 alamat (jeda 20 detik),
+ * lalu lihat di Email Log Search variasi mana yang Bounced.
+ */
+function menuTesEmail() {
+  const ui = SpreadsheetApp.getUi();
+  const r = ui.prompt('Tes pengiriman email', 'Alamat email tujuan tes (mis. budimul3006@gmail.com).\nAkan dikirim 5 email berbeda, jeda 20 detik (± 1,5 menit).', ui.ButtonSet.OK_CANCEL);
+  if (r.getSelectedButton() !== ui.Button.OK) return;
+  const ke = r.getResponseText().trim();
+  if (!/^\S+@\S+\.\S+$/.test(ke)) return ui.alert('Alamat email tidak valid.');
+  const url = urlWeb_(), tombol = tombol_(url + '?a=dk&id=TES123&s=TES', '✅ Bersedia', '#1E7B4A') + tombol_(url + '?a=dk&id=TES123&s=TES&p=tidak', '❌ Tidak Bersedia', '#B42318');
+  const v = [
+    ['TES 1 — teks polos', { body: 'Tes 1: email teks polos tanpa logo dan tanpa link.' }],
+    ['TES 2 — HTML + logo', { htmlBody: bungkusEmail_('<p>Tes 2: HTML dengan logo, tanpa link.</p>'), inlineImages: { logo: logoBlob_() } }],
+    ['TES 3 — link alamat form', { htmlBody: '<p>Tes 3: HTML tanpa logo, dengan link biasa ke <a href="' + url + '">' + url + '</a>.</p>' }],
+    ['TES 4 — tombol link aksi', { htmlBody: '<p>Tes 4: HTML tanpa logo, dengan tombol link aksi:</p><p>' + tombol + '</p>' }],
+    ['TES 5 — lengkap (logo + tombol)', { htmlBody: bungkusEmail_('<p>Tes 5: seperti email konfirmasi asli (logo + tombol):</p><p>' + tombol + '</p>'), inlineImages: { logo: logoBlob_() } }]
+  ];
+  const hasil = v.map((x, i) => {
+    if (i) Utilities.sleep(20000);
+    try { MailApp.sendEmail(Object.assign({ to: ke, subject: x[0] + ' (' + Utilities.formatDate(new Date(), TZ, 'HH:mm:ss') + ')', body: x[1].body || 'Tes' }, x[1])); return x[0] + ': terkirim'; }
+    catch (e) { return x[0] + ': GAGAL ' + e.message; }
+  });
+  logAksi_('SPL', '-', 'TES EMAIL', ke, hasil.join(' | '));
+  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Admin Console → Email Log Search untuk alamat ' + ke + ' (± 5 menit): mana yang Delivered dan mana yang Bounced.\nLink alamat yang dipakai: ' + url);
 }
