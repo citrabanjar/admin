@@ -95,6 +95,7 @@ function unggahBuktiPtj(token, nomor, nama, mime, b64) {
  */
 function simpanPtjSPD(token, d) {
   const u = sesiCek_(token);
+  besarSemua_(d, ['ringkasan'], { personel: ['keterangan'], biaya: ['uraian'] });
   cekAkses_(u, 'PTJ');
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');

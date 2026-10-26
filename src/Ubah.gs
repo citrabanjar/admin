@@ -94,7 +94,7 @@ function ajukanPerpanjangan(token, d) {
     if (S.perpanjanganPending) err.push('Masih ada perpanjangan surat ini yang menunggu persetujuan atasan.');
     if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d.kembali || ''))) err.push('Tanggal kembali baru wajib diisi.');
     else if (d.kembali <= S.kembali) err.push('Tanggal kembali baru harus setelah ' + tglIndo_(keTanggal_(S.kembali)) + '.');
-    const alasan = String(d.alasan || '').trim().slice(0, 500);
+    const alasan = besar_(d.alasan).slice(0, 500);
     if (!alasan) err.push('Alasan perpanjangan wajib diisi.');
     const setuju = {}; S.personel.filter(p => p.status === ST.SETUJU).forEach(p => setuju[p.id] = p);
     const ids = [...new Set((d.ids || []).map(x => String(x).toUpperCase()))].filter(x => setuju[x]);
@@ -305,7 +305,7 @@ function tambahKasSPD(token, d) {
     _K = null; _P = null;
     S = dataSpd_(String(d && d.nomor || ''));
     cekSuratBerjalan_(S);
-    const nominal = Math.round(Number(d.nominal)), alasan = String(d.alasan || '').trim().slice(0, 500), err = [];
+    const nominal = Math.round(Number(d.nominal)), alasan = besar_(d.alasan).slice(0, 500), err = [];
     if (!(nominal > 0)) err.push('Nominal tambahan kas wajib diisi.');
     if (!alasan) err.push('Alasan / keperluan tambahan kas wajib diisi.');
     if (!S.ketua) err.push('Belum ada personel yang disetujui pada surat ini.');
@@ -389,7 +389,7 @@ function selesaikanKurangKas(token, d) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');
   let I;
-  const nominal = Math.round(Number(d && d.nominal)), ket = String(d && d.keterangan || '').trim().slice(0, 300);
+  const nominal = Math.round(Number(d && d.nominal)), ket = besar_(d && d.keterangan).slice(0, 300);
   try {
     pastikanKolom_(SH.SPD, ['Potongan Gaji Ketua', 'Keterangan Potongan', 'Potongan Dicatat Oleh', 'Potongan Dicatat Pada']);
     const Ind = bacaBaris_SPD_induk_();

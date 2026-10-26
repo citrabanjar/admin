@@ -290,6 +290,14 @@ function logAksi_(jenis, nomor, aksi, oleh, ket) {
 if (typeof module !== 'undefined') module.exports = { hitungLembur_, hitungSPD_, formatNomor_, urutBerikutnya_, jamKeAngka_, angkaKeJam_, statusHari_ };
 
 /** "ANANG EFENDI" → "Sdr. Anang Efendi"; teks di dalam kurung tetap apa adanya: "HARTONO (HL)" → "Sdr. Hartono (HL)" */
+/** Teks isian surat dinas disimpan HURUF BESAR */
+function besar_(s) { return String(s == null ? '' : s).trim().toUpperCase(); }
+function besarSemua_(d, kunci, daftar) {
+  if (!d) return d;
+  kunci.forEach(k => { if (d[k] != null) d[k] = besar_(d[k]); });
+  Object.keys(daftar || {}).forEach(k => (d[k] || []).forEach(x => daftar[k].forEach(f => { if (x && x[f] != null) x[f] = besar_(x[f]); })));
+  return d;
+}
 function sdr_(nama) {
   return 'Sdr. ' + String(nama || '').trim().split(/(\([^)]*\))/).map(b => b.charAt(0) === '(' ? b :
     b.toLowerCase().replace(/(^|[\s.'-])([a-z])/g, (m, a, c) => a + c.toUpperCase())).join('');

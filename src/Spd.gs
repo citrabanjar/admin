@@ -16,6 +16,7 @@
 function simpanSPD(token, d) {
   const u = sesiCek_(token);
   cekAkses_(u, 'DINAS');
+  besarSemua_(d, ['noReferensi', 'customer', 'maksud', 'tempat'], { personel: ['keterangan'], biaya: ['uraian'] });
   pastikanKolom_(SH.PERSONEL, KOLOM_SPD_TAMBAHAN);
   pastikanKolom_(SH.SPD, ['Uang Kas Perjalanan']);
   const lock = LockService.getScriptLock();
