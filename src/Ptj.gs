@@ -50,7 +50,8 @@ function dataSpd_(nomor) {
   per.forEach(p => { const a = brk && p.lama ? ymd_(new Date(keTanggal_(brk).getTime() + (p.lama - 1) * 864e5)) : kmb; p.sampai = a > kmb ? kmb : a; p.masihTugas = !p.pulang && p.sampai === kmb; });
   const selesaiApproval = per.length > 0 && per.every(p => ST_FINAL.indexOf(p.status) >= 0);
   const disetujui = per.filter(p => p.status === ST.SETUJU);
-  const ketuaP = disetujui[0] || null;
+  const ditunjuk = String(I['Ketua Tim'] || '').toUpperCase();   // berganti bila ketua pulang lebih dulu & menyerahkan kas
+  const ketuaP = disetujui.find(p => p.id === ditunjuk) || disetujui[0] || null;
   return {
     nomor: nomor, tanggalSurat: tgl(I['Tanggal Surat']), noReferensi: I['No Surat Referensi'] || '', customer: I['Nama Customer'] || '',
     dasar: I['Dasar Penugasan'] || '', maksud: I['Maksud / Tujuan'], tempat: I['Tempat Tujuan'],
@@ -60,6 +61,7 @@ function dataSpd_(nomor) {
     personel: per, biaya: biaya, selesaiApproval: selesaiApproval,
     kasAwal: Number(I['Uang Kas Perjalanan']) || 0,
     uangKas: (Number(I['Uang Kas Perjalanan']) || 0) + ubah.filter(x => x.jenis === 'TAMBAH KAS').reduce((s, x) => s + x.tambahKas, 0),
+    serahKas: ubah.filter(x => x.jenis === 'SERAH KAS').map(x => ({ nominal: x.tambahKas, alasan: x.alasan, status: x.status, tanggal: x.dibuatPada ? ymd_(x.dibuatPada) : '' })),
     tambahKas: ubah.filter(x => x.jenis === 'TAMBAH KAS').map(x => ({ nominal: x.tambahKas, alasan: x.alasan, status: x.status, tanggal: x.dibuatPada ? ymd_(x.dibuatPada) : '' })),
     perpanjangan: ubah.filter(x => x.jenis === 'PERPANJANGAN').map(x => ({ lama: x.kembaliLama, baru: x.kembaliBaru, alasan: x.alasan, status: x.status, personel: x.personel })),
     perpanjanganPending: ubah.some(x => x.jenis === 'PERPANJANGAN' && [UBAH_ST.SETUJU, UBAH_ST.TOLAK].indexOf(x.status) < 0),

@@ -680,7 +680,7 @@ function buatPdfSPD_(I, rows) {
   const P = param_();
   const biaya = bacaTabel_(SH.BIAYA, 'Nomor SPD').filter(b => b['Nomor SPD'] === I['Nomor SPD']);
   const setuju = rows.filter(r => [ST.TIDAK, ST.TOLAK, ST.BATAL].indexOf(r['Status']) < 0);   // personel yang tidak bersedia / ditolak tidak dicantumkan
-  const ubah = perubahanSpd_(I['Nomor SPD']).filter(x => x.jenis === 'TAMBAH KAS' || x.status === UBAH_ST.SETUJU);   // riwayat perubahan (revisi)
+  const ubah = perubahanSpd_(I['Nomor SPD']).filter(x => x.jenis === 'TAMBAH KAS' || x.jenis === 'SERAH KAS' || x.status === UBAH_ST.SETUJU);   // riwayat perubahan (revisi)
   const totSaku = setuju.reduce((s, r) => s + (Number(r['Uang Saku']) || 0), 0);
   const totLain = biaya.reduce((s, b) => s + (Number(b['Jumlah (Rp)']) || 0), 0);
   const sek = t => '<div style="background:#3A3A3A;color:#fff;font-weight:bold;font-size:10px;padding:4px 6px;margin:10px 0 4px">' + t + '</div>';
@@ -717,8 +717,8 @@ function buatPdfSPD_(I, rows) {
       '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Tanggal', 'Perubahan', 'Keterangan', 'Status'].map(thP_).join('') + '</tr>' +
       ubah.map((x, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(x.dibuatPada ? tglIndo_(x.dibuatPada) : '-') +
         tdP_(x.jenis === 'PERPANJANGAN' ? 'Perpanjangan s/d <b>' + tglIndo_(keTanggal_(x.kembaliBaru)) + '</b> (semula ' + tglIndo_(keTanggal_(x.kembaliLama)) + ')<br>' +
-          x.personel.filter(p => p.status === UBAH_ST.SETUJU).map(p => escH_(p.nama)).join(', ') : 'Tambahan uang kas <b>' + rpH_(x.tambahKas) + '</b>') +
-        tdP_(escH_(x.alasan)) + tdP_(escH_(x.jenis === 'TAMBAH KAS' ? (x.status === UBAH_ST.DITERIMA ? 'Diterima ketua tim' : 'Menunggu konfirmasi') : x.status)) + '</tr>').join('') + '</table>' : '') +
+          x.personel.filter(p => p.status === UBAH_ST.SETUJU).map(p => escH_(p.nama)).join(', ') : (x.jenis === 'SERAH KAS' ? 'Serah terima uang kas <b>' : 'Tambahan uang kas <b>') + rpH_(x.tambahKas) + '</b>') +
+        tdP_(escH_(x.alasan)) + tdP_(escH_(x.jenis !== 'PERPANJANGAN' ? (x.status === UBAH_ST.DITERIMA ? 'Diterima ketua tim' : 'Menunggu konfirmasi') : x.status)) + '</tr>').join('') + '</table>' : '') +
     sek(String.fromCharCode(68 + (biaya.length ? 1 : 0) + (ubah.length ? 1 : 0)) + '. KETENTUAN') +
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
     '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +

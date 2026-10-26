@@ -779,6 +779,7 @@ async function muatOpen() {
     $('ptjList').innerHTML = OPEN.length ? OPEN.map(x => {
       const ok = x.personel.filter(p => p.status === 'DISETUJUI').length, n = esc(x.nomor).replace(/'/g, "\\'");
       const ubah = x.personel.filter(p => p.pulang).map(p => '<div class="sub">✔ ' + esc(p.nama) + ' lapor pulang ' + tglPendek(p.pulang) + ' — uang saku dibayar kasir</div>').join('') + x.perpanjangan.map(p => '<div class="sub">↪ Perpanjangan s/d ' + tglPendek(p.baru) + ' — <span class="st ' + (p.status === 'DISETUJUI' ? 'DISETUJUI' : p.status === 'DITOLAK' ? 'DITOLAK' : 'MENUNGGU') + '">' + esc(p.status) + '</span></div>').join('') +
+        (x.serahKas || []).map(t => '<div class="sub">⇄ ' + esc(t.alasan) + ' ' + rp(t.nominal) + ' — <span class="st ' + (t.status === 'DITERIMA' ? 'DISETUJUI' : 'MENUNGGU') + '">' + (t.status === 'DITERIMA' ? 'DITERIMA' : 'MENUNGGU KONFIRMASI') + '</span></div>').join('') +
         x.tambahKas.map(t => '<div class="sub">＋ Tambahan kas ' + rp(t.nominal) + ' — <span class="st ' + (t.status === 'DITERIMA' ? 'DISETUJUI' : 'MENUNGGU') + '">' + (t.status === 'DITERIMA' ? 'DITERIMA KETUA TIM' : 'MENUNGGU KONFIRMASI KETUA') + '</span></div>').join('');
       let aksi;
       if (x.statusDinas === 'Kurang Kas') aksi = '<div style="text-align:right"><span class="st DITOLAK">KURANG KAS ' + rp(x.kurangKas) + '</span><div style="margin-top:6px"><button class="btn kecil" onclick="potonganModal(\'' + n + '\')">Input potongan gaji</button></div></div>';
@@ -820,12 +821,18 @@ async function kirimPerpanjang(nomor) {
 }
 function pulangModal(nomor) {
   const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
-  const bisa = x.personel.filter(p => p.status === 'DISETUJUI' && !p.pulang && !(x.ketua && x.ketua.id === p.id));
-  if (!bisa.length) { modal('<h3 style="margin-top:0">Lapor Pulang</h3><p>Tidak ada personel yang bisa lapor pulang lebih dulu. Ketua tim' + (x.ketua ? ' (<b>' + esc(x.ketua.nama) + '</b>)' : '') +
-    ' memegang uang kas, sehingga kepulangannya dilaporkan melalui <b>Selesaikan</b>.</p><div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal()">OK</button></div>'); return; }
+  const aktif = x.personel.filter(p => p.status === 'DISETUJUI' && !p.pulang);
+  const bisa = aktif.length > 1 ? aktif : [];   // personel terakhir yang masih bertugas melapor lewat Selesaikan
+  if (!bisa.length) { modal('<h3 style="margin-top:0">Lapor Pulang</h3><p>Tinggal 1 personel yang masih bertugas' + (x.ketua ? ' (<b>' + esc(x.ketua.nama) + '</b>, ketua tim)' : '') +
+    ' — kepulangannya dilaporkan melalui <b>Selesaikan</b> beserta pertanggungjawaban uang kas.</p><div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal()">OK</button></div>'); return; }
   const maks = ymd_(new Date()) < x.kembali ? ymd_(new Date()) : x.kembali;
   modal('<h3 style="margin-top:0">Lapor Pulang Personel</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + ' · berangkat ' + tglPanjang(x.berangkat) + '</p>' +
-    '<label>Personel yang pulang lebih dulu *</label><select id="mId" onchange="hitungPulang()">' + bisa.map(p => '<option value="' + esc(p.id) + '" data-sampai="' + esc(p.sampai) + '">' + esc(p.nama) + ' (' + esc(p.id) + ')</option>').join('') + '</select>' +
+    '<label>Personel yang pulang lebih dulu *</label><select id="mId" onchange="$(\'mBaru\').innerHTML=\'\';hitungPulang()">' + bisa.map(p => '<option value="' + esc(p.id) + '">' + esc(p.nama) + ' (' + esc(p.id) + ')' + (x.ketua && x.ketua.id === p.id ? ' — KETUA TIM' : '') + '</option>').join('') + '</select>' +
+    '<div id="mSerah" class="hide" style="margin-top:10px;padding:10px 12px;border:1px solid #F3C9CC;background:#FFF7F7;border-radius:8px">' +
+      '<b>Ketua tim pulang lebih dulu — serah terima uang kas</b>' +
+      '<label style="margin-top:8px">Diserahkan kepada (ketua tim baru) *</label><select id="mBaru"></select>' +
+      '<label style="margin-top:8px">Sisa uang kas yang diserahkan (Rp) *</label><input id="mKas" type="text" inputmode="numeric" autocomplete="off" oninput="fmtRp(this)">' +
+      '<div class="sub" style="margin-top:6px">Ketua tim baru menerima email untuk mengonfirmasi sudah menerima uang kas, dan dialah yang membuat laporan akhir.</div></div>' +
     '<label style="margin-top:10px">Tanggal pulang *</label><input id="mTgl" type="date" min="' + x.berangkat + '" max="' + maks + '" onchange="hitungPulang()">' +
     '<div class="sub" id="mInfo" style="margin-top:6px"></div>' +
     '<label style="margin-top:10px">Keterangan <span class="sub">(opsional)</span></label><input id="mKet">' +
@@ -834,7 +841,9 @@ function pulangModal(nomor) {
   window._PX = x; hitungPulang();
 }
 function hitungPulang() {
-  const x = window._PX, t = $('mTgl').value;
+  const x = window._PX, t = $('mTgl').value, id = $('mId').value, ketua = x && x.ketua && x.ketua.id === id;
+  $('mSerah').classList.toggle('hide', !ketua);
+  if (ketua && !$('mBaru').options.length) $('mBaru').innerHTML = x.personel.filter(p => p.status === 'DISETUJUI' && !p.pulang && p.id !== id).map(p => '<option value="' + esc(p.id) + '">' + esc(p.nama) + ' (' + esc(p.id) + ')</option>').join('');
   if (!x || !t) { $('mInfo').textContent = ''; return; }
   const lama = Math.round((keTanggal_(t) - keTanggal_(x.berangkat)) / 864e5) + 1;
   $('mInfo').innerHTML = lama > 0 ? 'Lama dinas <b>' + lama + ' hari</b> · uang saku dibayar kasir <b>' + rp(lama * D.P.UANG_SAKU_HARI) + '</b>' : '';
@@ -842,9 +851,12 @@ function hitungPulang() {
 async function kirimPulang(nomor) {
   sibuk($('bYa'), true, 'Menyimpan…');
   try {
-    const r = await run('laporPulang', TOKEN, { nomor: nomor, id: $('mId').value, pulang: $('mTgl').value, keterangan: $('mKet').value });
+    const ketua = !$('mSerah').classList.contains('hide');
+    const r = await run('laporPulang', TOKEN, { nomor: nomor, id: $('mId').value, pulang: $('mTgl').value, keterangan: $('mKet').value,
+      ketuaBaru: ketua ? $('mBaru').value : '', kasSerah: ketua ? nilaiRp($('mKas')) : '' });
     if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
-    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Lapor pulang tercatat</h3><p><b>' + esc(r.nama) + '</b> pulang ' + tglPanjang(r.pulang) + ' (' + r.lama + ' hari).<br>Uang saku dibayar kasir: <b>' + rp(r.uangSaku) + '</b></p>' +
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Lapor pulang tercatat</h3><p><b>' + esc(r.nama) + '</b> pulang ' + tglPanjang(r.pulang) + ' (' + r.lama + ' hari).<br>Uang saku dibayar kasir: <b>' + rp(r.uangSaku) + '</b>' +
+      (r.serah ? '<br>Uang kas ' + rp(r.serah.nominal) + ' diserahkan kepada <b>' + esc(r.serah.ke) + '</b> (ketua tim baru) — menunggu konfirmasi penerimaan.' : '') + '</p>' +
       '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();muatOpen()">OK</button></div>');
   } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
 }
