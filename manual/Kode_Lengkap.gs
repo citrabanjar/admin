@@ -353,6 +353,7 @@ function onOpen() {
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
     .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')
     .addItem('🧪 Tes pengiriman email (diagnosa bounce)', 'menuTesEmail')
+    .addItem('🧪 Tes email isi asli (diagnosa bounce 2)', 'menuTesEmail2')
     .addToUi();
 }
 
@@ -566,6 +567,30 @@ function menuTesEmail() {
   });
   logAksi_('SPL', '-', 'TES EMAIL', ke, hasil.join(' | '));
   ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Admin Console → Email Log Search untuk alamat ' + ke + ' (± 5 menit): mana yang Delivered dan mana yang Bounced.\nLink alamat yang dipakai: ' + url);
+}
+
+/** Diagnosa 2: kirim isi email konfirmasi ASLI dari 1 surat dinas.
+ *  A = 1 email sendiri; jeda 30 detik; B & C = 2 email isi sama dikirim beruntun (seperti ke 2 personel sekaligus). */
+function menuTesEmail2() {
+  const ui = SpreadsheetApp.getUi();
+  const r1 = ui.prompt('Tes email isi asli', 'Alamat email tujuan tes:', ui.ButtonSet.OK_CANCEL);
+  if (r1.getSelectedButton() !== ui.Button.OK) return;
+  const r2 = ui.prompt('Tes email isi asli', 'Nomor Surat Perintah Dinas yang dipakai isinya (mis. 002 / SPD / CBA / X / 2026):', ui.ButtonSet.OK_CANCEL);
+  if (r2.getSelectedButton() !== ui.Button.OK) return;
+  const ke = r1.getResponseText().trim(), nomor = r2.getResponseText().trim();
+  const S = bacaBaris_('SPD'), r = S.rows.find(x => x['Nomor SPD'] === nomor);
+  if (!r) return ui.alert('Nomor surat tidak ditemukan.');
+  const I = induk_('SPD', nomor, r), J = JENIS.SPD, id = String(r['ID Baris']);
+  const isi = '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>' +
+    tabelDetail_('SPD', r, I, true) + '<p style="margin-top:18px">' + tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
+  const subj = 'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_('SPD', r, I);
+  const hasil = [];
+  hasil.push('A (sendiri): ' + (kirimEmail_(ke, '[TES A] ' + subj, isi) || 'terkirim'));
+  Utilities.sleep(30000);
+  hasil.push('B (beruntun): ' + (kirimEmail_(ke, '[TES B] ' + subj, isi) || 'terkirim'));
+  hasil.push('C (beruntun): ' + (kirimEmail_(ke, '[TES C] ' + subj, isi) || 'terkirim'));
+  logAksi_('SPD', nomor, 'TES EMAIL 2', ke, hasil.join(' | '));
+  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Email Log Search untuk ' + ke + ': status TES A, TES B, TES C.\n(Tombol di email tes ini adalah link asli — jangan diklik.)');
 }
 /**
  * =====================================================================
