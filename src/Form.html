@@ -168,7 +168,7 @@
         <button data-akses="PTJ" onclick="buka('ptj')">
           <div class="ic">📋</div>
           <div class="t">Pertanggungjawaban Dinas</div>
-          <div class="d">Selesaikan laporan perjalanan dinas yang masih <b>OPEN</b> — <b id="nOpen">…</b></div>
+          <div class="d">Perpanjangan, tambahan kas &amp; laporan perjalanan dinas yang masih <b>OPEN</b> — <b id="nOpen">…</b></div>
         </button>
       </div>
       <div class="card" style="margin-top:14px">
@@ -244,7 +244,7 @@
         </div>
         <div class="row" style="margin:12px 0 0">
           <div style="max-width:260px"><label>Uang Kas dalam Perjalanan (Rp) *</label><input id="dKas" type="text" inputmode="numeric" autocomplete="off" placeholder="isi 0 bila tidak ada" oninput="fmtRp(this);hitungSPD()"></div>
-          <div><label>&nbsp;</label><div class="sub" style="padding-top:6px">Uang saku dinas dibayarkan melalui aplikasi</div></div>
+          <div><label>&nbsp;</label><div class="sub" style="padding-top:6px">Uang saku dibayarkan setelah dinas selesai atau diambil dari uang kas dalam perjalanan</div></div>
         </div>
       </div>
       <div class="card" style="padding:0">
@@ -302,12 +302,17 @@
         </div>
         <div class="card">
           <div class="sek">Perhitungan Uang Kas dalam Perjalanan</div>
+          <label>Pembayaran uang saku *</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
+            <label class="cek"><input type="radio" name="tSakuCara" value="setelah" checked onchange="hitungPtj()"> Dibayarkan setelah dinas selesai</label>
+            <label class="cek"><input type="radio" name="tSakuCara" value="kas" onchange="hitungPtj()"> Diambil dari uang kas dalam perjalanan</label>
+          </div>
           <div class="tot3">
             <div><span class="sub">Uang kas dalam perjalanan</span><b id="tRen">-</b></div>
             <div><span class="sub">Biaya lainnya (realisasi)</span><b id="tRea">-</b></div>
             <div><span class="sub" id="tSelL">Harus dikembalikan</span><b id="tSel">-</b></div>
           </div>
-          <div class="sub" style="margin-top:8px">Uang saku <b id="tSakuR">-</b> dibayarkan melalui aplikasi KantorKu (tidak termasuk perhitungan uang kas).</div>
+          <div class="sub" style="margin-top:8px" id="tSakuInfo"></div>
         </div>
         <div id="tErr"></div>
         <div class="bar" style="justify-content:flex-end">
@@ -768,13 +773,79 @@ async function muatOpen() {
     OPEN = await run('spdOpen', TOKEN);
     $('nOpen').textContent = OPEN.length ? OPEN.length + ' surat OPEN' : 'tidak ada yang OPEN';
     $('ptjList').innerHTML = OPEN.length ? OPEN.map(x => {
-      const ok = x.personel.filter(p => p.status === 'DISETUJUI').length;
+      const ok = x.personel.filter(p => p.status === 'DISETUJUI').length, n = esc(x.nomor).replace(/'/g, "\\'");
+      const ubah = x.perpanjangan.map(p => '<div class="sub">↪ Perpanjangan s/d ' + tglPendek(p.baru) + ' — <span class="st ' + (p.status === 'DISETUJUI' ? 'DISETUJUI' : p.status === 'DITOLAK' ? 'DITOLAK' : 'MENUNGGU') + '">' + esc(p.status) + '</span></div>').join('') +
+        x.tambahKas.map(t => '<div class="sub">＋ Tambahan kas ' + rp(t.nominal) + ' — <span class="st ' + (t.status === 'DITERIMA' ? 'DISETUJUI' : 'MENUNGGU') + '">' + (t.status === 'DITERIMA' ? 'DITERIMA KETUA TIM' : 'MENUNGGU KONFIRMASI KETUA') + '</span></div>').join('');
+      let aksi;
+      if (x.statusDinas === 'Kurang Kas') aksi = '<div style="text-align:right"><span class="st DITOLAK">KURANG KAS ' + rp(x.kurangKas) + '</span><div style="margin-top:6px"><button class="btn kecil" onclick="potonganModal(\'' + n + '\')">Input potongan gaji</button></div></div>';
+      else if (!x.selesaiApproval) aksi = '<span class="st MENUNGGU" title="Konfirmasi / persetujuan personel belum selesai">PROSES PERSETUJUAN</span>';
+      else aksi = '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
+        (x.perpanjanganPending ? '' : '<button class="btn sec kecil" onclick="perpanjangModal(\'' + n + '\')">Perpanjang</button>') +
+        '<button class="btn sec kecil" onclick="tambahKasModal(\'' + n + '\')">Tambah Kas</button>' +
+        (x.perpanjanganPending ? '<span class="st MENUNGGU" title="Selesaikan setelah perpanjangan diproses atasan">PERPANJANGAN DIPROSES</span>' : '<button class="btn kecil" onclick="pilihPtj(\'' + n + '\')">Selesaikan</button>') + '</div>';
       return '<div class="op-item"><div><b>' + esc(x.nomor) + '</b><div class="sub">' + esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) +
-        ' · ' + ok + ' dari ' + x.personel.length + ' personel disetujui</div><div class="sub"><i>' + esc(x.maksud) + '</i></div></div>' +
-        (x.selesaiApproval ? '<button class="btn kecil" onclick="pilihPtj(\'' + esc(x.nomor) + '\')">Selesaikan</button>'
-          : '<span class="st MENUNGGU" title="Konfirmasi / persetujuan personel belum selesai">PROSES PERSETUJUAN</span>') + '</div>';
+        ' · ' + ok + ' dari ' + x.personel.length + ' personel disetujui · kas ' + rp(x.uangKas) + '</div><div class="sub"><i>' + esc(x.maksud) + '</i></div>' + ubah + '</div>' + aksi + '</div>';
     }).join('') : '<div class="sub">Tidak ada Surat Perintah Dinas yang berstatus OPEN. 👍</div>';
   } catch (e) { if (!sesiHabis(e)) $('ptjList').innerHTML = '<div class="msg err">' + esc(errText(e)) + '</div>'; }
+}
+/* ----- perpanjangan / tambah kas / potongan gaji ----- */
+function perpanjangModal(nomor) {
+  const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
+  const per = x.personel.filter(p => p.status === 'DISETUJUI');
+  modal('<h3 style="margin-top:0">Perpanjangan Dinas</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + '<br>Tanggal kembali saat ini: <b>' + tglPanjang(x.kembali) + '</b></p>' +
+    '<label>Tanggal kembali baru *</label><input id="mKmb" type="date" min="' + ymd_(new Date(keTanggal_(x.kembali).getTime() + 864e5)) + '">' +
+    '<label style="margin-top:10px">Alasan perpanjangan *</label><textarea id="mAlasan" rows="3"></textarea>' +
+    '<label style="margin-top:10px">Personel yang diperpanjang *</label>' +
+    per.map(p => '<label class="cek" style="margin-bottom:6px"><input type="checkbox" class="mPer" value="' + esc(p.id) + '" checked> ' + esc(p.nama) + ' <span class="sub">' + esc(p.id) + '</span></label>').join('') +
+    '<p class="sub">Persetujuan dikirim ke atasan masing-masing personel; owner mendapat pemberitahuan. Setelah disetujui, PDF surat direvisi.</p><div id="mErr"></div>' +
+    '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Batal</button><button class="btn" id="bYa" onclick="kirimPerpanjang(\'' + esc(x.nomor).replace(/'/g, "\\'") + '\')">Ajukan</button></div>');
+}
+async function kirimPerpanjang(nomor) {
+  const d = { nomor: nomor, kembali: $('mKmb').value, alasan: $('mAlasan').value, ids: [...document.querySelectorAll('.mPer:checked')].map(c => c.value) };
+  sibuk($('bYa'), true, 'Mengirim…');
+  try {
+    const r = await run('ajukanPerpanjangan', TOKEN, d);
+    if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Perpanjangan diajukan</h3><p>Permintaan persetujuan dikirim ke atasan. Setelah disetujui, PDF surat revisi dikirim ke ketua tim.</p>' +
+      (r.peringatan && r.peringatan.length ? '<div class="msg warn">' + r.peringatan.map(esc).join('<br>') + '</div>' : '') +
+      '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();muatOpen()">OK</button></div>');
+  } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
+}
+function tambahKasModal(nomor) {
+  const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
+  modal('<h3 style="margin-top:0">Tambah Uang Kas dalam Perjalanan</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + '<br>Uang kas saat ini: <b>' + rp(x.uangKas) + '</b>' +
+    (x.ketua ? '<br>Ketua tim: <b>' + esc(x.ketua.nama) + '</b>' : '') + '</p>' +
+    '<label>Nominal tambahan (Rp) *</label><input id="mNom" type="text" inputmode="numeric" autocomplete="off" oninput="fmtRp(this)">' +
+    '<label style="margin-top:10px">Keperluan / alasan *</label><textarea id="mAlasan" rows="3"></textarea>' +
+    '<p class="sub">Ketua tim menerima email berisi PDF surat revisi dan tombol konfirmasi sudah menerima uang kas tambahan.</p><div id="mErr"></div>' +
+    '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Batal</button><button class="btn" id="bYa" onclick="kirimTambahKas(\'' + esc(x.nomor).replace(/'/g, "\\'") + '\')">Simpan</button></div>');
+}
+async function kirimTambahKas(nomor) {
+  const d = { nomor: nomor, nominal: Number(nilaiRp($('mNom'))) || 0, alasan: $('mAlasan').value };
+  sibuk($('bYa'), true, 'Menyimpan…');
+  try {
+    const r = await run('tambahKasSPD', TOKEN, d);
+    if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Tambahan kas tercatat</h3><p>Email konfirmasi & PDF surat revisi dikirim ke ketua tim' + (r.ketua ? ' <b>' + esc(r.ketua) + '</b>' : '') + '.</p>' +
+      '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();muatOpen()">OK</button></div>');
+  } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
+}
+function potonganModal(nomor) {
+  const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
+  modal('<h3 style="margin-top:0">Potongan Gaji Ketua Tim</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + '<br>Kekurangan kas: <b>' + rp(x.kurangKas) + '</b>' +
+    (x.ketua ? '<br>Ketua tim: <b>' + esc(x.ketua.nama) + '</b>' : '') + '</p>' +
+    '<label>Nominal dipotong dari gaji (Rp) *</label><input id="mNom" type="text" inputmode="numeric" autocomplete="off" oninput="fmtRp(this)" value="' + Number(x.kurangKas || 0).toLocaleString('id-ID') + '">' +
+    '<label style="margin-top:10px">Keterangan <span class="sub">(mis. periode gaji)</span></label><input id="mKet">' +
+    '<p class="sub">Setelah disimpan, status surat menjadi SELESAI.</p><div id="mErr"></div>' +
+    '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Batal</button><button class="btn" id="bYa" onclick="kirimPotongan(\'' + esc(x.nomor).replace(/'/g, "\\'") + '\')">Simpan</button></div>');
+}
+async function kirimPotongan(nomor) {
+  sibuk($('bYa'), true, 'Menyimpan…');
+  try {
+    const r = await run('selesaikanKurangKas', TOKEN, { nomor: nomor, nominal: Number(nilaiRp($('mNom'))) || 0, keterangan: $('mKet').value });
+    if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
+    tutupModal(); muatOpen();
+  } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
 }
 function tutupPtj() { PT = null; $('ptjForm').classList.add('hide'); $('ptjList').classList.remove('hide'); pesan('tErr'); }
 function pilihPtj(nomor) {
@@ -782,7 +853,9 @@ function pilihPtj(nomor) {
   $('ptjList').classList.add('hide'); $('ptjForm').classList.remove('hide');
   $('ptjInfo').innerHTML = '<div class="sek">A. Surat Perintah Dinas</div><b style="font-size:16px">' + esc(PT.nomor) + '</b>' +
     '<div class="sub" style="font-size:13px;margin-top:4px">' + esc(PT.maksud) + '<br>Tujuan: <b>' + esc(PT.tempat) + '</b> · Rencana ' + tglPanjang(PT.berangkat) + ' s/d ' + tglPanjang(PT.kembali) +
-    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '<br>Uang kas dalam perjalanan: <b>' + rp(PT.uangKas || 0) + '</b></div>';
+    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '<br>Uang kas dalam perjalanan: <b>' + rp(PT.uangKas || 0) + '</b>' +
+    (PT.tambahKas.length ? ' (awal ' + rp(PT.kasAwal) + ' + tambahan ' + rp(PT.uangKas - PT.kasAwal) + ')' : '') + (PT.ketua ? '<br>Ketua tim: <b>' + esc(PT.ketua.nama) + '</b>' : '') + '</div>';
+  document.querySelector('input[name=tSakuCara][value=setelah]').checked = true;
   $('tBrk').value = PT.berangkat; $('tKmb').value = PT.kembali; $('tRingkas').value = ''; $('tSah').checked = false;
   const per = PT.personel.filter(p => p.status === 'DISETUJUI');
   $('tPer').innerHTML = per.length ? per.map((p, i) => '<tr data-id="' + esc(p.id) + '"><td class="n">' + (i + 1) + '</td>' +
@@ -878,16 +951,20 @@ function hitungPtj() {
     lain += Number(jm) || 0;
   });
   if (!$('tRingkas').value.trim()) e.push('Isi ringkasan hasil kegiatan.');
-  const kas = PT.uangKas || 0, sisa = kas - lain;
-  $('tRen').textContent = rp(kas); $('tRea').textContent = rp(lain); $('tSakuR').textContent = rp(saku);
-  $('tSelL').textContent = sisa < 0 ? 'Kekurangan kas (dibayar perusahaan)' : 'Uang kas harus dikembalikan';
+  const dariKas = sakuDariKas(), kas = PT.uangKas || 0, sisa = kas - lain - (dariKas ? saku : 0);
+  $('tRen').textContent = rp(kas); $('tRea').textContent = rp(lain + (dariKas ? saku : 0));
+  $('tRea').previousElementSibling.textContent = dariKas ? 'Biaya lainnya + uang saku' : 'Biaya lainnya (realisasi)';
+  $('tSakuInfo').innerHTML = (PT.tambahKas && PT.tambahKas.length ? 'Uang kas: awal ' + rp(PT.kasAwal) + PT.tambahKas.map(t => ' + tambahan ' + rp(t.nominal)).join('') + '.<br>' : '') +
+    'Uang saku <b>' + rp(saku) + '</b> ' + (dariKas ? 'diambil dari uang kas dalam perjalanan (mengurangi sisa kas).' : 'dibayarkan setelah dinas selesai (tidak termasuk perhitungan uang kas).');
+  $('tSelL').textContent = sisa < 0 ? 'Kekurangan kas — dipotong dari gaji ketua tim' + (PT.ketua ? ' (Sdr. ' + PT.ketua.nama + ')' : '') : 'Uang kas harus dikembalikan';
   $('tSel').textContent = rp(Math.abs(sisa));
   PTJ_OK = !e.length; $('tSimpan').disabled = !PTJ_OK; $('tSimpan').title = [...new Set(e)].join('\n');
   return [...new Set(e)];
 }
+function sakuDariKas() { const x = document.querySelector('input[name=tSakuCara]:checked'); return !!x && x.value === 'kas'; }
 function ptjData() {
   return {
-    nomor: PT.nomor, berangkat: $('tBrk').value, kembali: $('tKmb').value, ringkasan: $('tRingkas').value, pengesahan: $('tSah').checked,
+    nomor: PT.nomor, sakuDariKas: sakuDariKas(), berangkat: $('tBrk').value, kembali: $('tKmb').value, ringkasan: $('tRingkas').value, pengesahan: $('tSah').checked,
     personel: [...document.querySelectorAll('#tPer tr[data-id]')].map(tr => ({ id: tr.dataset.id, lama: Number(tr.querySelector('.lm').value), keterangan: tr.querySelector('.ket').value })),
     biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(nilaiRp(r.el.querySelector('.jm'))) || 0,
       link: r.link, tanpa: r.el.querySelector('.tb').checked })).filter(x => x.jenis)
@@ -897,7 +974,9 @@ function ptjKonfirmasi() {
   const e = hitungPtj();
   if (!PTJ_OK) { pesan('tErr', 'err', e.map(esc).join('<br>')); return; }
   modal('<h3 style="margin-top:0">Simpan Pertanggungjawaban</h3><p><b>' + esc(PT.nomor) + '</b><br>' + esc(PT.tempat) + '<br>' + $('tSelL').textContent + ' <b>' + $('tSel').textContent + '</b></p>' +
-    '<p class="sub">Setelah disimpan, status surat menjadi SELESAI dan laporan PDF dikirim ke admin.</p>' +
+    '<p class="sub">' + ($('tSel').textContent && $('tSelL').textContent.indexOf('Kekurangan') === 0
+      ? 'Setelah disimpan, status surat menjadi <b>KURANG KAS</b>. Setelah kekurangan dipotong dari gaji ketua tim, catat potongannya di daftar surat agar status menjadi SELESAI.'
+      : 'Setelah disimpan, status surat menjadi SELESAI dan laporan PDF dikirim ke admin.') + '</p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="ptjKirim()">Ya, simpan</button></div>');
 }
 async function ptjKirim() {
@@ -905,8 +984,9 @@ async function ptjKirim() {
   try {
     const r = await run('simpanPtjSPD', TOKEN, ptjData());
     if (!r.ok) { tutupModal(); pesan('tErr', 'err', '<b>Belum tersimpan:</b><br>' + r.error.map(esc).join('<br>')); return; }
-    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Pertanggungjawaban tersimpan</h3><p><b>' + esc(r.nomor) + '</b> — status <span class="st SELESAI">SELESAI</span></p>' +
-      '<p>Uang kas ' + rp(r.uangKas) + ' − biaya lainnya ' + rp(r.biayaLain) + '<br>' + (r.kasKembali < 0 ? 'Kekurangan kas (dibayar perusahaan) ' : 'Uang kas harus dikembalikan ') + '<b>' + rp(Math.abs(r.kasKembali)) + '</b></p>' +
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Pertanggungjawaban tersimpan</h3><p><b>' + esc(r.nomor) + '</b> — status <span class="st ' + (r.kasKembali < 0 ? 'DITOLAK' : 'SELESAI') + '">' + esc(r.status) + '</span></p>' +
+      '<p>Uang kas ' + rp(r.uangKas) + ' − biaya lainnya ' + rp(r.biayaLain) + (ptjData().sakuDariKas ? ' − uang saku ' + rp(r.uangSaku) : '') + '<br>' +
+      (r.kasKembali < 0 ? 'Kekurangan kas (dipotong dari gaji ketua tim ' + esc(r.ketua) + ') ' : 'Uang kas harus dikembalikan ') + '<b>' + rp(Math.abs(r.kasKembali)) + '</b></p>' +
       '<p><a href="' + esc(r.pdf) + '" target="_blank">📄 Buka PDF laporan</a></p>' +
       '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();tutupPtj();muatOpen()">Selesai</button></div>');
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('tErr', 'err', esc(errText(e))); }

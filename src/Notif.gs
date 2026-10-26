@@ -119,6 +119,8 @@ function bungkusEmail_(isi) {
 function tombol_(href, teks, warna) {
   return '<a href="' + href + '" style="display:inline-block;background:' + warna + ';color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;margin:4px 8px 4px 0">' + teks + '</a>';
 }
+/** Uang kas dalam perjalanan = kas awal + tambahan kas */
+function kasTotal_(I) { return (Number(I['Uang Kas Perjalanan']) || 0) + (Number(I['Tambahan Kas']) || 0); }
 function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
   const baris = jenis === 'SPL' ? [
     ['Nomor SPL', r['Nomor SPL']],
@@ -137,7 +139,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
     ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
     ['Uang Saku', rpH_(r['Uang Saku'])],
-  ].concat(Number(I['Uang Kas Perjalanan']) ? [['Uang Kas Perjalanan', rpH_(I['Uang Kas Perjalanan']) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
+  ].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
     ['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]   // Surat Perintah Dinas diperintahkan langsung oleh owner
@@ -180,7 +182,9 @@ function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
 /* ======================= Halaman aksi (link dari email) ======================= */
 function halamanAksi_(p) {
   if (p.a === 'b') return halamanBatal_(p);
-  if (p.a === 'dg') return halamanGrupDinas_(p);   // pembatalan lembur oleh atasan / owner (Batal.gs)
+  if (p.a === 'dg') return halamanGrupDinas_(p);
+  if (p.a === 'pp') return halamanPerpanjangan_(p);   // persetujuan perpanjangan dinas (Ubah.gs)
+  if (p.a === 'kt') return halamanTerimaKas_(p);      // konfirmasi terima tambahan kas (Ubah.gs)   // pembatalan lembur oleh atasan / owner (Batal.gs)
   const aksi = p.a, id = p.id, sig = p.s;
   let isi;
   try {
@@ -663,6 +667,7 @@ function buatPdfSPD_(I, rows) {
   const P = param_();
   const biaya = bacaTabel_(SH.BIAYA, 'Nomor SPD').filter(b => b['Nomor SPD'] === I['Nomor SPD']);
   const setuju = rows.filter(r => [ST.TIDAK, ST.TOLAK, ST.BATAL].indexOf(r['Status']) < 0);   // personel yang tidak bersedia / ditolak tidak dicantumkan
+  const ubah = perubahanSpd_(I['Nomor SPD']).filter(x => x.jenis === 'TAMBAH KAS' || x.status === UBAH_ST.SETUJU);   // riwayat perubahan (revisi)
   const totSaku = setuju.reduce((s, r) => s + (Number(r['Uang Saku']) || 0), 0);
   const totLain = biaya.reduce((s, b) => s + (Number(b['Jumlah (Rp)']) || 0), 0);
   const sek = t => '<div style="background:#3A3A3A;color:#fff;font-weight:bold;font-size:10px;padding:4px 6px;margin:10px 0 4px">' + t + '</div>';
@@ -671,7 +676,7 @@ function buatPdfSPD_(I, rows) {
   const tglB = I['Tgl Berangkat'], tglK = I['Tgl Kembali'];
   // kop & nomor surat diulang di setiap halaman (thead tabel pembungkus)
   const html = '<html><head><meta charset="utf-8"><style>@page{size:A4;margin:12mm}body{font-family:Arial,sans-serif;font-size:10px;color:#222}table.hal{width:100%;border-collapse:collapse}table.hal>thead{display:table-header-group}table.hal>thead>tr>td,table.hal>tbody>tr>td{padding:0}tr{page-break-inside:avoid}</style></head><body>' +
-    '<table class="hal"><thead><tr><td>' + kopPdf_('SURAT PERINTAH DINAS', I['Nomor SPD']) + '</td></tr></thead><tbody><tr><td>' +
+    '<table class="hal"><thead><tr><td>' + kopPdf_('SURAT PERINTAH DINAS', I['Nomor SPD'] + (ubah.length ? ' — Revisi ' + ubah.length : '')) + '</td></tr></thead><tbody><tr><td>' +
     sek('A. REFERENSI SURAT') +
     kv([['Nomor Surat', I['No Surat Referensi'] || '-', 'Tanggal Surat', tglIndo_(I['Tanggal Surat'])], ['Nama Customer', I['Nama Customer'] || '-', 'Dasar Penugasan', I['Dasar Penugasan'] || '-']]) +
     sek('B. DETAIL PERJALANAN DINAS') +
@@ -679,7 +684,7 @@ function buatPdfSPD_(I, rows) {
         ['Tgl. Berangkat', hariIndo_(tglB) + ', ' + tglIndo_(tglB), 'Tgl. Kembali', hariIndo_(tglK) + ', ' + tglIndo_(tglK)],
         ['Lama Dinas', I['Lama (hari)'] + ' hari', 'Transportasi', I['Transportasi']],
         ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
-        ['Uang Kas Perjalanan', rpH_(Number(I['Uang Kas Perjalanan']) || 0)]]) +
+        ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
     sek('C. PERSONEL YANG DITUGASKAN') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Uang Saku', 'Keterangan'].map(thP_).join('') + '</tr>' +
     setuju.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
@@ -695,15 +700,21 @@ function buatPdfSPD_(I, rows) {
     '<table style="width:100%;margin-top:6px;border-collapse:collapse"><tr><td style="padding:6px;border:2px solid #BE353F;font-weight:bold;font-size:11px">TOTAL BIAYA PERJALANAN DINAS (Uang Saku disetujui + Biaya Lainnya)</td>' +
     '<td style="padding:6px;border:2px solid #BE353F;font-weight:bold;font-size:11px;text-align:right;width:130px;color:#BE353F">' + rpH_(totSaku + totLain) + '</td></tr></table>'
     ) : '') +
-    sek((biaya.length ? 'E' : 'D') + '. KETENTUAN') +
+    (ubah.length ? sek((biaya.length ? 'E' : 'D') + '. RIWAYAT PERUBAHAN SURAT') +
+      '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Tanggal', 'Perubahan', 'Keterangan', 'Status'].map(thP_).join('') + '</tr>' +
+      ubah.map((x, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(x.dibuatPada ? tglIndo_(x.dibuatPada) : '-') +
+        tdP_(x.jenis === 'PERPANJANGAN' ? 'Perpanjangan s/d <b>' + tglIndo_(keTanggal_(x.kembaliBaru)) + '</b> (semula ' + tglIndo_(keTanggal_(x.kembaliLama)) + ')<br>' +
+          x.personel.filter(p => p.status === UBAH_ST.SETUJU).map(p => escH_(p.nama)).join(', ') : 'Tambahan uang kas <b>' + rpH_(x.tambahKas) + '</b>') +
+        tdP_(escH_(x.alasan)) + tdP_(escH_(x.jenis === 'TAMBAH KAS' ? (x.status === UBAH_ST.DITERIMA ? 'Diterima ketua tim' : 'Menunggu konfirmasi') : x.status)) + '</tr>').join('') + '</table>' : '') +
+    sek(String.fromCharCode(68 + (biaya.length ? 1 : 0) + (ubah.length ? 1 : 0)) + '. KETENTUAN') +
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
     '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +
     '<li>Selama tanggal dinas luar tidak dapat diajukan lembur; pengajuan lembur pada tanggal tersebut akan ditolak.</li>' +
-    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari).</li>' +
-    '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) = uang kas yang harus dikembalikan.</li>' +
+    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari), dibayarkan setelah dinas selesai atau diambil dari uang kas dalam perjalanan.</li>' +
+    '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) dan uang saku yang diambil dari kas = uang kas yang harus dikembalikan. Kekurangan uang kas menjadi tanggungan ketua tim (personel No. 1) dan dipotong dari gaji.</li>' +
     '<li>Mintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan sebagai bukti kehadiran.</li>' +
     '<li>Laporan perjalanan dinas beserta bukti pengeluaran diserahkan ke Admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
-    sek((biaya.length ? 'F' : 'E') + '. PENGESAHAN DI TEMPAT TUJUAN') +
+    sek(String.fromCharCode(69 + (biaya.length ? 1 : 0) + (ubah.length ? 1 : 0)) + '. PENGESAHAN DI TEMPAT TUJUAN') +
     '<table style="width:100%;border-collapse:collapse;font-size:9px"><tr>' + ['TIBA DI TEMPAT TUJUAN', 'BERANGKAT DARI TEMPAT TUJUAN'].map(t =>
       '<td style="width:50%;border:1px solid #BBB;padding:6px;vertical-align:top"><b>' + t + '</b><br><br>Tempat : ............................<br><br>Tanggal : ............................<br><br>Jam : ............................' +
       '<div style="height:50px"></div><div style="text-align:center;color:#555">( Nama, Tanda Tangan & Stempel Instansi )</div></td>').join('') + '</tr></table>' +

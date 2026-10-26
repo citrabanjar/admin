@@ -53,5 +53,8 @@ function jalankanTugas_(t) {
   if (t.t === 'selesai') return cekSelesai_(t.jenis, t.nomor);
   if (t.t === 'batal') return batalLanjutan_(t);
   if (t.t === 'persetujuanDinas') return kirimPersetujuanDinas_(t.nomor);
+  if (t.t === 'perpanjangan') return kirimPersetujuanPerpanjangan_(t.id);
+  if (t.t === 'perpanjanganCek') return selesaiPerpanjangan_(t.id);
+  if (t.t === 'tambahKas') return kirimTambahKas_(t.id);
   throw new Error('Tugas tidak dikenal: ' + t.t);
 }

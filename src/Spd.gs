@@ -122,7 +122,7 @@ function riwayatSPD(token) {
       totalBiaya: Number(r['Total Biaya']) || 0, uangKas: Number(r['Uang Kas Perjalanan']) || 0,
       dibuat: r['Dibuat Pada'] instanceof Date ? r['Dibuat Pada'].getTime() : 0,
       orang: per[r['Nomor SPD']] || [], pdf: r['Link PDF'] || '', pdfLaporan: r['Link PDF Laporan'] || '',
-      statusDinas: String(r['Status Dinas'] || 'Aktif') === 'Selesai' ? 'SELESAI' : 'OPEN'
+      statusDinas: String(r['Status Dinas'] || 'Aktif') === 'Selesai' ? 'SELESAI' : String(r['Status Dinas']) === 'Kurang Kas' ? 'KURANG KAS' : 'OPEN'
     }))
     .sort((a, b) => b.dibuat - a.dibuat).slice(0, 30);
 }

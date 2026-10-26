@@ -14,7 +14,7 @@ const SH_PTJ = { INDUK: 'Ptj SPD', PERSONEL: 'Ptj Personel SPD', BIAYA: 'Ptj Bia
 const KOLOM_PTJ = {
   'Ptj SPD': ['Nomor SPD', 'Tgl Berangkat Aktual', 'Tgl Kembali Aktual', 'Lama Aktual (hari)', 'Ringkasan Kegiatan', 'Pengesahan Diterima',
     'Uang Saku Rencana', 'Uang Saku Realisasi', 'Biaya Lain Rencana', 'Biaya Lain Realisasi', 'Total Rencana', 'Total Realisasi', 'Selisih',
-    'Uang Kas Perjalanan', 'Uang Kas Dikembalikan',
+    'Uang Kas Perjalanan', 'Uang Kas Dikembalikan', 'Pembayaran Uang Saku', 'Ketua Tim',
     'Dilaporkan Oleh', 'Dilaporkan Pada', 'Link PDF'],
   'Ptj Personel SPD': ['Nomor SPD', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'],
   'Ptj Biaya SPD': ['Nomor SPD', 'No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti', 'Link Bukti']
@@ -43,6 +43,7 @@ function dataSpd_(nomor) {
   const biaya = bacaTabel_(SH.BIAYA, 'Nomor SPD').filter(r => r['Nomor SPD'] === nomor).map(r => ({
     jenis: r['Jenis Biaya'], uraian: r['Uraian'], jumlah: Number(r['Jumlah (Rp)']) || 0, bukti: r['Bukti']
   }));
+  const ubah = perubahanSpd_(nomor);
   const selesaiApproval = per.length > 0 && per.every(p => ST_FINAL.indexOf(p.status) >= 0);
   const disetujui = per.filter(p => p.status === ST.SETUJU);
   return {
@@ -52,7 +53,13 @@ function dataSpd_(nomor) {
     transportasi: I['Transportasi'], sumberBiaya: I['Sumber Biaya'], statusDinas: I['Status Dinas'] || 'Aktif',
     statusApproval: I['Status'] || '', dibuatOleh: I['Dibuat Oleh'], emailPembuat: I['Email Pembuat'],
     personel: per, biaya: biaya, selesaiApproval: selesaiApproval,
-    uangKas: Number(I['Uang Kas Perjalanan']) || 0,
+    kasAwal: Number(I['Uang Kas Perjalanan']) || 0,
+    uangKas: (Number(I['Uang Kas Perjalanan']) || 0) + ubah.filter(x => x.jenis === 'TAMBAH KAS').reduce((s, x) => s + x.tambahKas, 0),
+    tambahKas: ubah.filter(x => x.jenis === 'TAMBAH KAS').map(x => ({ nominal: x.tambahKas, alasan: x.alasan, status: x.status, tanggal: x.dibuatPada ? ymd_(x.dibuatPada) : '' })),
+    perpanjangan: ubah.filter(x => x.jenis === 'PERPANJANGAN').map(x => ({ lama: x.kembaliLama, baru: x.kembaliBaru, alasan: x.alasan, status: x.status, personel: x.personel })),
+    perpanjanganPending: ubah.some(x => x.jenis === 'PERPANJANGAN' && [UBAH_ST.SETUJU, UBAH_ST.TOLAK].indexOf(x.status) < 0),
+    ketua: disetujui[0] ? { id: disetujui[0].id, nama: disetujui[0].nama } : null,
+    kurangKas: String(I['Status Dinas']) === 'Kurang Kas' ? -(Number(I['Uang Kas Dikembalikan']) || 0) : 0,
     uangSakuRencana: disetujui.reduce((s, p) => s + p.uangSaku, 0), biayaRencana: biaya.reduce((s, b) => s + b.jumlah, 0)
   };
 }
@@ -97,7 +104,8 @@ function simpanPtjSPD(token, d) {
     const P = param_(), S = dataSpd_(String(d && d.nomor || ''));
     const err = [];
     if (!S) throw new Error('Surat Perintah Dinas tidak ditemukan.');
-    if (S.statusDinas === 'Selesai') throw new Error('Pertanggungjawaban surat ini sudah diselesaikan.');
+    if (S.statusDinas === 'Selesai' || S.statusDinas === 'Kurang Kas') throw new Error('Pertanggungjawaban surat ini sudah diselesaikan.');
+    if (S.perpanjanganPending) err.push('Masih ada perpanjangan dinas yang menunggu persetujuan atasan.');
     if (!S.selesaiApproval) err.push('Proses konfirmasi / persetujuan personel belum selesai.');
     const tglOk = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
     if (!tglOk(d.berangkat) || !tglOk(d.kembali)) err.push('Tanggal berangkat & kembali aktual wajib diisi.');
@@ -125,12 +133,14 @@ function simpanPtjSPD(token, d) {
     const sakuReal = per.reduce((s, p) => s + p.uangSaku, 0);
     const lainReal = biaya.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
     const totRencana = S.uangSakuRencana + S.biayaRencana, totReal = sakuReal + lainReal;
-    const kasKembali = S.uangKas - lainReal;   // + = dikembalikan ke perusahaan, - = kekurangan (dibayar perusahaan)
+    const sakuDariKas = !!d.sakuDariKas;   // uang saku diambil dari uang kas dalam perjalanan
+    const kasKembali = S.uangKas - lainReal - (sakuDariKas ? sakuReal : 0);   // + = dikembalikan, - = kekurangan (dipotong dari gaji ketua tim)
+    const ketua = S.ketua ? S.ketua.nama : '-';
     const now = new Date(), tp = s => Utilities.parseDate(s + ' 00:00', TZ, 'yyyy-MM-dd HH:mm');
 
     const ptj = { berangkat: d.berangkat, kembali: d.kembali, lamaAktual: lamaAktual, ringkasan: String(d.ringkasan).trim(),
       pengesahan: !!d.pengesahan, personel: per, biaya: biaya, sakuReal: sakuReal, lainReal: lainReal, totRencana: totRencana, totReal: totReal,
-      uangKas: S.uangKas, kasKembali: kasKembali,
+      uangKas: S.uangKas, kasAwal: S.kasAwal, tambahKas: S.tambahKas, kasKembali: kasKembali, sakuDariKas: sakuDariKas, ketua: ketua,
       oleh: u.nama, pada: now };
     const pdf = buatPdfPtj_(S, ptj);
     const file = folderPdf_(JENIS.SPD.folder).createFile(pdf);
@@ -141,6 +151,7 @@ function simpanPtjSPD(token, d) {
       'Uang Saku Rencana': S.uangSakuRencana, 'Uang Saku Realisasi': sakuReal, 'Biaya Lain Rencana': S.biayaRencana, 'Biaya Lain Realisasi': lainReal,
       'Total Rencana': totRencana, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana,
       'Uang Kas Perjalanan': S.uangKas, 'Uang Kas Dikembalikan': kasKembali,
+      'Pembayaran Uang Saku': sakuDariKas ? 'Diambil dari uang kas' : 'Dibayar setelah dinas selesai', 'Ketua Tim': ketua,
       'Dilaporkan Oleh': u.nama, 'Dilaporkan Pada': now, 'Link PDF': file.getUrl() }]);
     tulisBaris_(SH_PTJ.PERSONEL, per.map(p => ({ 'Nomor SPD': S.nomor, 'Employee ID': p.ref.id, 'Full Name': p.ref.nama, 'Lama Rencana': p.ref.lama,
       'Lama Aktual': p.lama, 'Uang Saku Rencana': p.ref.uangSaku, 'Uang Saku Realisasi': p.uangSaku, 'Keterangan': p.keterangan })));
@@ -150,24 +161,25 @@ function simpanPtjSPD(token, d) {
     // tutup Surat Perintah Dinas
     pastikanKolom_(SH.SPD, ['Tgl Laporan', 'Total Realisasi', 'Selisih', 'Uang Kas Dikembalikan', 'Link PDF Laporan']);
     const Ind = bacaBaris_SPD_induk_(), I = Ind.rows.find(x => x['Nomor SPD'] === S.nomor);
-    if (I) ubahBaris_(Ind, I._row, { 'Status Dinas': 'Selesai', 'Tgl Laporan': now, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana, 'Uang Kas Dikembalikan': kasKembali, 'Link PDF Laporan': file.getUrl() });
+    if (I) ubahBaris_(Ind, I._row, { 'Status Dinas': kasKembali < 0 ? 'Kurang Kas' : 'Selesai', 'Tgl Laporan': now, 'Total Realisasi': totReal, 'Selisih': totReal - totRencana, 'Uang Kas Dikembalikan': kasKembali, 'Link PDF Laporan': file.getUrl() });
     SpreadsheetApp.flush();
 
     const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(sdr_(u.nama)) + '.</p>' +
-      '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + ' = <b>' + kasTeks_(kasKembali) + '</b>.<br>' +
-      'Uang saku ' + rpH_(sakuReal) + ' dibayarkan melalui aplikasi KantorKu.</p>' +
+      '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + (sakuDariKas ? ' − uang saku ' + rpH_(sakuReal) : '') + ' = <b>' + kasTeks_(kasKembali, ketua) + '</b>.<br>' +
+      'Uang saku ' + rpH_(sakuReal) + (sakuDariKas ? ' diambil dari uang kas dalam perjalanan.' : ' dibayarkan setelah dinas selesai.') + '</p>' +
+      (kasKembali < 0 ? '<p><b style="color:#B42318">Status: KURANG KAS</b> — setelah kekurangan dipotong dari gaji ketua tim, catat potongannya di form Pertanggungjawaban Dinas agar surat SELESAI.</p>' : '') +
       '<p>PDF laporan terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
     const admin = String(P.EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(S.emailPembuat || u.email).toLowerCase();
     kirimEmail_(pembuat, 'Laporan Pertanggungjawaban Dinas ' + S.nomor, isi, admin && admin !== pembuat ? admin : '', pdf);
-    logAksi_('SPD', S.nomor, 'PERTANGGUNGJAWABAN', u.email, 'Kas ' + rpH_(S.uangKas) + ' − biaya ' + rpH_(lainReal) + ' → ' + kasTeks_(kasKembali));
-    hasil = { ok: true, nomor: S.nomor, uangKas: S.uangKas, biayaLain: lainReal, kasKembali: kasKembali, uangSaku: sakuReal, pdf: file.getUrl() };
+    logAksi_('SPD', S.nomor, 'PERTANGGUNGJAWABAN', u.email, 'Kas ' + rpH_(S.uangKas) + ' − biaya ' + rpH_(lainReal) + (sakuDariKas ? ' − saku ' + rpH_(sakuReal) : '') + ' → ' + kasTeks_(kasKembali, ketua));
+    hasil = { ok: true, status: kasKembali < 0 ? 'KURANG KAS' : 'SELESAI', ketua: sdr_(ketua), nomor: S.nomor, uangKas: S.uangKas, biayaLain: lainReal, kasKembali: kasKembali, uangSaku: sakuReal, pdf: file.getUrl() };
   } finally { lock.releaseLock(); }
   return hasil;
 }
 
 /** Teks hasil uang kas: positif = dikembalikan, negatif = kekurangan */
-function kasTeks_(n) {
-  return n > 0 ? 'uang kas dikembalikan ' + rpH_(n) : n < 0 ? 'kekurangan kas ' + rpH_(-n) + ' (dibayar perusahaan)' : 'uang kas habis terpakai (Rp 0)';
+function kasTeks_(n, ketua) {
+  return n > 0 ? 'uang kas dikembalikan ' + rpH_(n) : n < 0 ? 'kekurangan kas ' + rpH_(-n) + ' (dipotong dari gaji ketua tim' + (ketua ? ' ' + sdr_(ketua) : '') + ')' : 'uang kas habis terpakai (Rp 0)';
 }
 
 function buatPdfPtj_(S, R) {
@@ -187,7 +199,7 @@ function buatPdfPtj_(S, R) {
     sek('B. REALISASI PERJALANAN') +
     kv([['Berangkat Aktual', tg(R.berangkat), 'Kembali Aktual', tg(R.kembali)],
         ['Lama Aktual', R.lamaAktual + ' hari', 'Pengesahan Tujuan', R.pengesahan ? 'Diterima' : 'Belum diterima']]) +
-    sek('C. PERSONEL & UANG SAKU (DIBAYARKAN MELALUI APLIKASI KANTORKU)') +
+    sek('C. PERSONEL & UANG SAKU (' + (R.sakuDariKas ? 'DIAMBIL DARI UANG KAS DALAM PERJALANAN' : 'DIBAYARKAN SETELAH DINAS SELESAI') + ')') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'].map(thP_).join('') + '</tr>' +
     R.personel.map((p, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(p.ref.id)) + tdP_('<b>' + escH_(p.ref.nama) + '</b>') +
       tdP_(p.ref.lama + ' hari', 'text-align:center') + tdP_(p.lama + ' hari', 'text-align:center') + tdP_(rpH_(p.ref.uangSaku), 'text-align:right') +
@@ -199,11 +211,14 @@ function buatPdfPtj_(S, R) {
       totRow('TOTAL BIAYA LAINNYA', 3, rpH_(R.lainReal), 1) + '</table>' : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
     sek('E. PERHITUNGAN UANG KAS DALAM PERJALANAN') +
     '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
-    [['Uang kas dalam perjalanan (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )'],
-     [R.kasKembali >= 0 ? 'UANG KAS YANG HARUS DIKEMBALIKAN' : 'KEKURANGAN UANG KAS (dibayarkan perusahaan)', rpH_(Math.abs(R.kasKembali))]]
-      .map((r, i) => '<tr><td style="padding:5px;border:' + (i === 2 ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
-        (i === 2 ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>').join('') + '</table>' +
-    '<div style="font-size:9px;color:#555;margin-top:4px">Uang saku personel ' + rpH_(R.sakuReal) + ' dibayarkan melalui aplikasi KantorKu dan tidak termasuk perhitungan uang kas.</div>' +
+    [].concat(R.tambahKas && R.tambahKas.length ? [['Uang kas dalam perjalanan awal', rpH_(R.kasAwal)]].concat(R.tambahKas.map(t => ['Tambahan uang kas' + (t.tanggal ? ' ' + tglIndo_(keTanggal_(t.tanggal)) : '') + ' — ' + escH_(t.alasan), rpH_(t.nominal)])) : [],
+      [['Total uang kas dalam perjalanan (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )']],
+      R.sakuDariKas ? [['Dikurangi: uang saku personel (bagian C)', '( ' + rpH_(R.sakuReal) + ' )']] : [],
+      [[R.kasKembali >= 0 ? 'UANG KAS YANG HARUS DIKEMBALIKAN' : 'KEKURANGAN UANG KAS (dipotong dari gaji ketua tim ' + escH_(sdr_(R.ketua)) + ')', rpH_(Math.abs(R.kasKembali))]])
+      .map((r, i, a) => { const akhir = i === a.length - 1; return '<tr><td style="padding:5px;border:' + (akhir ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
+        (akhir ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>'; }).join('') + '</table>' +
+    '<div style="font-size:9px;color:#555;margin-top:4px">' + (R.sakuDariKas ? 'Uang saku personel ' + rpH_(R.sakuReal) + ' diambil dari uang kas dalam perjalanan.' :
+      'Uang saku personel ' + rpH_(R.sakuReal) + ' dibayarkan setelah dinas selesai dan tidak termasuk perhitungan uang kas.') + '</div>' +
     sek('F. RINGKASAN HASIL KEGIATAN') +
     '<div style="border:1px solid #BBB;padding:8px;font-size:10px;white-space:pre-wrap;min-height:40px">' + escH_(R.ringkasan) + '</div>' +
     '<p style="text-align:right;font-size:10px;margin-top:12px">' + (param_().KOTA_SURAT ? escH_(param_().KOTA_SURAT) + ', ' : '') + tglIndo_(R.pada) + '</p>' +
