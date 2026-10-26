@@ -1767,12 +1767,11 @@ function buatPdfSPD_(I, rows) {
         ['Lama Dinas', I['Lama (hari)'] + ' hari', 'Transportasi', I['Transportasi']],
         ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
         ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
-    sek('C. PERSONEL YANG DITUGASKAN') +
-    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Uang Saku', 'Keterangan'].map(thP_).join('') + '</tr>' +
+    sek('C. KARYAWAN YANG DITUGASKAN') +
+    '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Keterangan'].map(thP_).join('') + '</tr>' +
     setuju.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
-      tdP_(r['Lama (hari)'], 'text-align:center') + tdP_(rpH_(r['Uang Saku']), 'text-align:right') + tdP_(escH_(r['Keterangan'])) + '</tr>').join('') +
-    '<tr><td colspan="5" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL UANG SAKU (' + setuju.length + ' orang)</td>' +
-    '<td style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">' + rpH_(totSaku) + '</td><td style="border:1px solid #BBB;background:#EFF0F2"></td></tr></table>' +
+      tdP_(r['Lama (hari)'], 'text-align:center') + tdP_(escH_(r['Keterangan'])) + '</tr>').join('') +
+    '<tr><td colspan="6" style="padding:5px;border:1px solid #BBB;text-align:right;font-weight:bold;font-size:9px;background:#EFF0F2">TOTAL KARYAWAN : ' + setuju.length + ' orang</td></tr></table>' +
     (biaya.length ? (   // biaya lainnya kini diisi di Pertanggungjawaban Dinas; tampil hanya untuk surat lama yang punya rencana biaya
     sek('D. BIAYA PERJALANAN DINAS LAINNYA') +
     (biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
@@ -1790,12 +1789,9 @@ function buatPdfSPD_(I, rows) {
         tdP_(escH_(x.alasan)) + tdP_(escH_(x.jenis !== 'PERPANJANGAN' ? (x.status === UBAH_ST.DITERIMA ? 'Diterima ketua tim' : 'Menunggu konfirmasi') : x.status)) + '</tr>').join('') + '</table>' : '') +
     sek(String.fromCharCode(68 + (biaya.length ? 1 : 0) + (ubah.length ? 1 : 0)) + '. KETENTUAN') +
     '<ol style="font-size:9px;margin:4px 0 0 14px;padding:0;line-height:1.5">' +
-    '<li>Karyawan yang tercantum di atas ditugaskan melaksanakan perjalanan dinas sesuai maksud, tempat, dan tanggal yang tercantum dalam surat ini.</li>' +
-    '<li>Selama tanggal dinas luar tidak dapat diajukan lembur; pengajuan lembur pada tanggal tersebut akan ditolak.</li>' +
-    '<li>Uang saku diberikan per orang per hari dinas (' + rpH_(P.UANG_SAKU_HARI) + '/hari), dibayarkan setelah dinas selesai atau diambil dari uang kas dalam perjalanan.</li>' +
-    '<li>Uang kas dalam perjalanan dipertanggungjawabkan setelah kembali: uang kas dikurangi biaya lainnya (sesuai bukti) dan uang saku yang diambil dari kas = uang kas yang harus dikembalikan. Kekurangan uang kas menjadi tanggungan ketua tim (personel No. 1) dan dipotong dari gaji.</li>' +
+    '<li>Selama dinas karyawan tidak dapat mengajukan lembur.</li>' +
     '<li>Mintakan tanda tangan & stempel pada kolom Pengesahan di tempat tujuan sebagai bukti kehadiran.</li>' +
-    '<li>Laporan perjalanan dinas beserta bukti pengeluaran diserahkan ke Admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
+    '<li>Laporan perjalanan dinas dan pertanggungjawaban kas wajib dilaporkan ke admin paling lambat 3 hari kerja setelah kembali.</li></ol>' +
     sek(String.fromCharCode(69 + (biaya.length ? 1 : 0) + (ubah.length ? 1 : 0)) + '. PENGESAHAN DI TEMPAT TUJUAN') +
     '<table style="width:100%;border-collapse:collapse;font-size:9px"><tr>' + ['TIBA DI TEMPAT TUJUAN', 'BERANGKAT DARI TEMPAT TUJUAN'].map(t =>
       '<td style="width:50%;border:1px solid #BBB;padding:6px;vertical-align:top"><b>' + t + '</b><br><br>Tempat : ............................<br><br>Tanggal : ............................<br><br>Jam : ............................' +
