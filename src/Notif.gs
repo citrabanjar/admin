@@ -185,7 +185,8 @@ function kirimKonfirmasi_(jenis, nomor) {
 function tabelRingkasDinas_(r, I) {
   const baris = [['Nomor SPD', I['Nomor SPD']], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
     ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
-    ['Transportasi', I['Transportasi']], ['Uang Saku', rpH_(r['Uang Saku'])]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : []);
+    ['Transportasi', I['Transportasi']], ['Uang Saku', rpH_(r['Uang Saku'])]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
+    [['Ditugaskan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
     escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
 }
