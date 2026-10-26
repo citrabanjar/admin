@@ -417,21 +417,25 @@ function cekSelesai_(jenis, nomor, paksa) {
   const pembuat = String(I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, 'PDF ' + jenis + ' ' + nomor + ' — ' + ringkasTanggal_(jenis, rows[0], I), isi, admin && admin !== pembuat ? admin : '', pdf);
   logAksi_(jenis, nomor, 'PDF DIKIRIM', pembuat, file.getUrl());
-  if (jenis === 'SPD' && !belum.length) {   // surat final → PDF dikirim ke SATU karyawan per rombongan (penyetuju sama)
-    const K = karyawan_(), grup = {};
-    ok.forEach(r => { const a = penyetujuDinas_(r['Employee ID']), g = a ? a.id : '-'; (grup[g] = grup[g] || []).push(r); });
-    Object.values(grup).forEach(tim => {
-      const r = tim.find(x => (K[String(x['Employee ID']).toUpperCase()] || {}).email);
-      if (!r) return;
-      const k = K[String(r['Employee ID']).toUpperCase()];
-      const daftar = tim.length > 1 ? '<p>Surat ini berlaku untuk seluruh tim:</p><ol>' + tim.map(x => '<li><b>' + escH_(sdr_(x['Full Name'])) + '</b>' +
-        (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + '</li>').join('') + '</ol>' : '';
-      const err = kirimEmail_(k.email, 'Surat Perintah Dinas ' + nomor + ' — ' + ringkasTanggal_(jenis, r, I),
-        '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Perjalanan dinas ' + (tim.length > 1 ? 'tim Anda' : 'Anda') + ' telah <b style="color:#1E7B4A">DISETUJUI</b>. Terlampir Surat Perintah Dinas.</p>' +
-        tabelDetail_('SPD', r, I, false, tim.length > 1) + daftar, '', pdf);
-      tim.forEach(x => ubahBaris_(S, x._row, { 'Status Email': err ? 'GAGAL kirim PDF: ' + err : 'PDF surat terkirim ke ' + k.email + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') }));
-      logAksi_(jenis, nomor, err ? 'PDF KE KARYAWAN GAGAL' : 'PDF KE KARYAWAN', k.email, tim.map(x => x['Full Name']).join(', ') + (err ? ' — ' + err : ''));
+  if (jenis === 'SPD' && !belum.length && ok.length) {
+    // surat final (semua atasan sudah memproses) → PDF terlampir hanya ke 1 orang (personel disetujui pertama yang ber-email);
+    // personel lain yang disetujui menerima konfirmasi persetujuan tanpa lampiran
+    const K = karyawan_(), em = x => (K[String(x['Employee ID']).toUpperCase()] || {}).email || '';
+    const pemegang = ok.find(em);
+    const tim = '<p>Personel yang ditugaskan:</p><ol>' + ok.map(x => '<li><b>' + escH_(sdr_(x['Full Name'])) + '</b>' +
+      (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + '</li>').join('') + '</ol>';
+    ok.forEach(r => {
+      const ke = em(r);
+      if (!ke) return;
+      const utama = r === pemegang;
+      const err = kirimEmail_(ke, 'Surat Perintah Dinas ' + nomor + ' Disetujui — ' + ringkasTanggal_(jenis, r, I),
+        '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Surat Perintah Dinas berikut telah <b style="color:#1E7B4A">DISETUJUI</b>.' +
+        (utama ? ' Terlampir Surat Perintah Dinas.' : ' Surat Perintah Dinas dikirimkan kepada <b>' + escH_(sdr_(pemegang['Full Name'])) + '</b>.') + '</p>' +
+        tabelDetail_('SPD', r, I, false, ok.length > 1) + (ok.length > 1 ? tim : ''), '', utama ? pdf : null);
+      ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL kirim: ' + err : (utama ? 'PDF surat terkirim ke ' : 'Konfirmasi disetujui terkirim ke ') + ke + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+      if (err) logAksi_(jenis, nomor, 'EMAIL KARYAWAN GAGAL', ke, err);
     });
+    if (pemegang) logAksi_(jenis, nomor, 'PDF KE KARYAWAN', em(pemegang), pemegang['Full Name']);
   }
   return 'PDF dibuat & dikirim ke ' + pembuat;
 }
