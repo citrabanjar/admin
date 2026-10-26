@@ -34,6 +34,7 @@ function antri_(tugas) {
 function prosesAntrian() {
   const P = PropertiesService.getScriptProperties();
   P.setProperty(ANTRIAN_DETAK, String(Date.now()));
+  try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return;
   let q;

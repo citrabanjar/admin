@@ -584,7 +584,7 @@ function hitungSPL() {
       orang++;
       if (dipakai[id]) e.push('Karyawan ini sudah ada di baris ' + dipakai[id] + '.'); else dipakai[id] = i + 1;
       const dn = tgl && (D.dinas || []).find(x => x.id === id && x.dari <= tgl && tgl <= x.sampai);
-      if (dn) e.push('Sedang dinas luar (' + dn.nomor + ', ' + tglPendek(dn.dari) + ' s/d ' + tglPendek(dn.sampai) + ') — tidak bisa diinput lembur.');
+      if (dn) e.push('Sedang dinas luar (' + dn.nomor + ', ' + tglPendek(dn.dari) + (dn.sampai === '9999-12-31' ? ', belum lapor pulang' : ' s/d ' + tglPendek(dn.sampai)) + ') — tidak bisa diinput lembur.');
       if (!tgl) e.push('Isi Tanggal Lembur terlebih dahulu.');
       else if (m && s) { h = hitungLembur_({ tanggal: tgl, mulai: m, selesai: s, gaji: 0 }, D.P, liburForm()); e.push.apply(e, h.error); w.push.apply(w, h.peringatan); }
       else e.push('Pilih jam mulai & jam selesai.');
@@ -778,13 +778,14 @@ async function muatOpen() {
     $('nOpen').textContent = OPEN.length ? OPEN.length + ' surat OPEN' : 'tidak ada yang OPEN';
     $('ptjList').innerHTML = OPEN.length ? OPEN.map(x => {
       const ok = x.personel.filter(p => p.status === 'DISETUJUI').length, n = esc(x.nomor).replace(/'/g, "\\'");
-      const ubah = x.perpanjangan.map(p => '<div class="sub">↪ Perpanjangan s/d ' + tglPendek(p.baru) + ' — <span class="st ' + (p.status === 'DISETUJUI' ? 'DISETUJUI' : p.status === 'DITOLAK' ? 'DITOLAK' : 'MENUNGGU') + '">' + esc(p.status) + '</span></div>').join('') +
+      const ubah = x.personel.filter(p => p.pulang).map(p => '<div class="sub">✔ ' + esc(p.nama) + ' lapor pulang ' + tglPendek(p.pulang) + ' — uang saku dibayar kasir</div>').join('') + x.perpanjangan.map(p => '<div class="sub">↪ Perpanjangan s/d ' + tglPendek(p.baru) + ' — <span class="st ' + (p.status === 'DISETUJUI' ? 'DISETUJUI' : p.status === 'DITOLAK' ? 'DITOLAK' : 'MENUNGGU') + '">' + esc(p.status) + '</span></div>').join('') +
         x.tambahKas.map(t => '<div class="sub">＋ Tambahan kas ' + rp(t.nominal) + ' — <span class="st ' + (t.status === 'DITERIMA' ? 'DISETUJUI' : 'MENUNGGU') + '">' + (t.status === 'DITERIMA' ? 'DITERIMA KETUA TIM' : 'MENUNGGU KONFIRMASI KETUA') + '</span></div>').join('');
       let aksi;
       if (x.statusDinas === 'Kurang Kas') aksi = '<div style="text-align:right"><span class="st DITOLAK">KURANG KAS ' + rp(x.kurangKas) + '</span><div style="margin-top:6px"><button class="btn kecil" onclick="potonganModal(\'' + n + '\')">Input potongan gaji</button></div></div>';
       else if (!x.selesaiApproval) aksi = '<span class="st MENUNGGU" title="Konfirmasi / persetujuan personel belum selesai">PROSES PERSETUJUAN</span>';
       else aksi = '<div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">' +
         (x.perpanjanganPending ? '' : '<button class="btn sec kecil" onclick="perpanjangModal(\'' + n + '\')">Perpanjang</button>') +
+        '<button class="btn sec kecil" onclick="pulangModal(\'' + n + '\')">Lapor Pulang</button>' +
         '<button class="btn sec kecil" onclick="tambahKasModal(\'' + n + '\')">Tambah Kas</button>' +
         (x.perpanjanganPending ? '<span class="st MENUNGGU" title="Selesaikan setelah perpanjangan diproses atasan">PERPANJANGAN DIPROSES</span>' : '<button class="btn kecil" onclick="pilihPtj(\'' + n + '\')">Selesaikan</button>') + '</div>';
       return '<div class="op-item"><div><b>' + esc(x.nomor) + '</b><div class="sub">' + esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) +
@@ -814,6 +815,36 @@ async function kirimPerpanjang(nomor) {
     if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
     modal('<h3 style="margin-top:0;color:var(--ok)">✅ Perpanjangan diajukan</h3><p>Permintaan persetujuan dikirim ke atasan. Setelah disetujui, PDF surat revisi dikirim ke ketua tim.</p>' +
       (r.peringatan && r.peringatan.length ? '<div class="msg warn">' + r.peringatan.map(esc).join('<br>') + '</div>' : '') +
+      '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();muatOpen()">OK</button></div>');
+  } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
+}
+function pulangModal(nomor) {
+  const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
+  const bisa = x.personel.filter(p => p.status === 'DISETUJUI' && !p.pulang && !(x.ketua && x.ketua.id === p.id));
+  if (!bisa.length) { modal('<h3 style="margin-top:0">Lapor Pulang</h3><p>Tidak ada personel yang bisa lapor pulang lebih dulu. Ketua tim' + (x.ketua ? ' (<b>' + esc(x.ketua.nama) + '</b>)' : '') +
+    ' memegang uang kas, sehingga kepulangannya dilaporkan melalui <b>Selesaikan</b>.</p><div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal()">OK</button></div>'); return; }
+  const maks = ymd_(new Date()) < x.kembali ? ymd_(new Date()) : x.kembali;
+  modal('<h3 style="margin-top:0">Lapor Pulang Personel</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + ' · berangkat ' + tglPanjang(x.berangkat) + '</p>' +
+    '<label>Personel yang pulang lebih dulu *</label><select id="mId" onchange="hitungPulang()">' + bisa.map(p => '<option value="' + esc(p.id) + '" data-sampai="' + esc(p.sampai) + '">' + esc(p.nama) + ' (' + esc(p.id) + ')</option>').join('') + '</select>' +
+    '<label style="margin-top:10px">Tanggal pulang *</label><input id="mTgl" type="date" min="' + x.berangkat + '" max="' + maks + '" onchange="hitungPulang()">' +
+    '<div class="sub" id="mInfo" style="margin-top:6px"></div>' +
+    '<label style="margin-top:10px">Keterangan <span class="sub">(opsional)</span></label><input id="mKet">' +
+    '<p class="sub">Uang saku personel ini dibayarkan oleh kasir di kantor dan tidak masuk pertanggungjawaban ketua tim. Karyawan bisa diajukan lembur lagi mulai hari berikutnya.</p><div id="mErr"></div>' +
+    '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Batal</button><button class="btn" id="bYa" onclick="kirimPulang(\'' + esc(x.nomor).replace(/'/g, "\\'") + '\')">Simpan</button></div>');
+  window._PX = x; hitungPulang();
+}
+function hitungPulang() {
+  const x = window._PX, t = $('mTgl').value;
+  if (!x || !t) { $('mInfo').textContent = ''; return; }
+  const lama = Math.round((keTanggal_(t) - keTanggal_(x.berangkat)) / 864e5) + 1;
+  $('mInfo').innerHTML = lama > 0 ? 'Lama dinas <b>' + lama + ' hari</b> · uang saku dibayar kasir <b>' + rp(lama * D.P.UANG_SAKU_HARI) + '</b>' : '';
+}
+async function kirimPulang(nomor) {
+  sibuk($('bYa'), true, 'Menyimpan…');
+  try {
+    const r = await run('laporPulang', TOKEN, { nomor: nomor, id: $('mId').value, pulang: $('mTgl').value, keterangan: $('mKet').value });
+    if (!r.ok) { sibuk($('bYa'), false); pesan('mErr', 'err', r.error.map(esc).join('<br>')); return; }
+    modal('<h3 style="margin-top:0;color:var(--ok)">✅ Lapor pulang tercatat</h3><p><b>' + esc(r.nama) + '</b> pulang ' + tglPanjang(r.pulang) + ' (' + r.lama + ' hari).<br>Uang saku dibayar kasir: <b>' + rp(r.uangSaku) + '</b></p>' +
       '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();muatOpen()">OK</button></div>');
   } catch (e) { sibuk($('bYa'), false); if (!sesiHabis(e)) pesan('mErr', 'err', esc(errText(e))); }
 }
@@ -864,10 +895,11 @@ function pilihPtj(nomor) {
   document.querySelector('input[name=tSakuCara][value=setelah]').checked = true;
   $('tBrk').value = PT.berangkat; $('tKmb').value = PT.kembali; $('tRingkas').value = ''; $('tSah').checked = false;
   const per = PT.personel.filter(p => p.status === 'DISETUJUI');
-  $('tPer').innerHTML = per.length ? per.map((p, i) => '<tr data-id="' + esc(p.id) + '"><td class="n">' + (i + 1) + '</td>' +
-    '<td data-l="Personel"><b>' + esc(p.nama) + '</b><div class="sub">' + esc(p.id) + ' · ' + esc(p.jabatan || '') + '</div><div class="rowerr"></div></td>' +
+  $('tPer').innerHTML = per.length ? per.map((p, i) => '<tr data-id="' + esc(p.id) + '"' + (p.pulang ? ' data-kasir="1"' : '') + '><td class="n">' + (i + 1) + '</td>' +
+    '<td data-l="Personel"><b>' + esc(p.nama) + '</b><div class="sub">' + esc(p.id) + ' · ' + esc(p.jabatan || '') + '</div>' +
+      (p.pulang ? '<div class="sub" style="color:var(--ok)">✔ Lapor pulang ' + tglPendek(p.pulang) + ' — uang saku dibayar kasir</div>' : '') + '<div class="rowerr"></div></td>' +
     '<td class="auto half" data-l="Lama Rencana">' + p.lama + ' hari</td>' +
-    '<td class="half" data-l="Lama Aktual (hari)"><input class="lm" type="number" min="0" step="1" value="' + p.lama + '" oninput="hitungPtj()"></td>' +
+    '<td class="half" data-l="Lama Aktual (hari)"><input class="lm" type="number" min="0" step="1" value="' + (p.pulang ? p.lamaAktual : p.lama) + '"' + (p.pulang ? ' disabled' : '') + ' oninput="hitungPtj()"></td>' +
     '<td class="auto uang saku half" data-l="Uang Saku Realisasi">-</td>' +
     '<td data-l="Keterangan"><input class="ket" placeholder="opsional"></td></tr>').join('')
     : '<tr><td colspan="6" class="sub" style="padding:12px">Tidak ada personel yang disetujui — surat tetap bisa ditutup dengan laporan.</td></tr>';
@@ -934,9 +966,10 @@ function hitungPtj() {
   const lama = (b && k) ? Math.max(Math.round((keTanggal_(k) - keTanggal_(b)) / 86400000) + 1, 0) : 0;
   $('tLama').textContent = lama ? lama + ' hari' : '–';
   if (!b || !k) e.push('Isi tanggal berangkat & kembali aktual.'); else if (k < b) e.push('Tanggal kembali lebih awal dari tanggal berangkat.');
-  let saku = 0;
+  let saku = 0, sakuKasir = 0;
   document.querySelectorAll('#tPer tr[data-id]').forEach(tr => {
     const v = tr.querySelector('.lm').value, n = Number(v), er = [];
+    if (tr.dataset.kasir) { tr.querySelector('.saku').textContent = rp(n * D.P.UANG_SAKU_HARI); sakuKasir += n * D.P.UANG_SAKU_HARI; return; }
     if (v === '' || !(n >= 0 && n === Math.floor(n))) er.push('Isi lama aktual.');
     else if (lama && n > lama) er.push('Melebihi lama dinas (' + lama + ' hari).');
     tr.querySelector('.saku').textContent = (n >= 0 && v !== '') ? rp(n * D.P.UANG_SAKU_HARI) : '-';
@@ -961,6 +994,7 @@ function hitungPtj() {
   $('tRen').textContent = rp(kas); $('tRea').textContent = rp(lain + (dariKas ? saku : 0));
   $('tRea').previousElementSibling.textContent = dariKas ? 'Biaya lainnya + uang saku' : 'Biaya lainnya (realisasi)';
   $('tSakuInfo').innerHTML = (PT.tambahKas && PT.tambahKas.length ? 'Uang kas: awal ' + rp(PT.kasAwal) + PT.tambahKas.map(t => ' + tambahan ' + rp(t.nominal)).join('') + '.<br>' : '') +
+    (sakuKasir ? 'Uang saku <b>' + rp(sakuKasir) + '</b> personel yang lapor pulang lebih dulu sudah dibayar kasir (tidak termasuk perhitungan).<br>' : '') +
     'Uang saku <b>' + rp(saku) + '</b> ' + (dariKas ? 'diambil dari uang kas dalam perjalanan (mengurangi sisa kas).' : 'dibayarkan setelah dinas selesai (tidak termasuk perhitungan uang kas).');
   $('tSelL').textContent = sisa < 0 ? 'Kekurangan kas — dipotong dari gaji ketua tim' + (PT.ketua ? ' (Sdr. ' + PT.ketua.nama + ')' : '') : 'Uang kas harus dikembalikan';
   $('tSel').textContent = rp(Math.abs(sisa));

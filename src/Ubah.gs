@@ -409,3 +409,75 @@ function selesaikanKurangKas(token, d) {
   kirimEmail_(pembuat, 'Kekurangan Kas Dinas Diselesaikan — ' + I['Nomor SPD'], isi, admin && admin !== pembuat ? admin : '');
   return { ok: true };
 }
+
+/* ============================== LAPOR PULANG (parsial) ============================== */
+/** Personel pulang lebih dulu: uang saku dibayar kasir di kantor, langsung bisa diajukan lembur lagi.
+ *  Ketua tim memegang uang kas → tidak lewat sini, melainkan lewat pertanggungjawaban akhir.
+ *  d = {nomor, id, pulang:'yyyy-MM-dd', keterangan} */
+function laporPulang(token, d) {
+  const u = sesiCek_(token);
+  cekUbahBoleh_(u);
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30000)) throw new Error('Server sibuk, coba lagi beberapa detik lagi.');
+  let hasil;
+  try {
+    _K = null; _P = null;
+    const S = dataSpd_(String(d && d.nomor || ''));
+    cekSuratBerjalan_(S);
+    const id = String(d.id || '').toUpperCase(), p = S.personel.find(x => x.id === id && x.status === ST.SETUJU), err = [];
+    if (!p) throw new Error('Personel tidak ditemukan di surat ini.');
+    if (p.pulang) throw new Error(sdr_(p.nama) + ' sudah lapor pulang (' + tglIndo_(keTanggal_(p.pulang)) + ').');
+    if (S.ketua && S.ketua.id === id) err.push('Ketua tim memegang uang kas dalam perjalanan — kepulangan ketua tim dilaporkan melalui pertanggungjawaban akhir (Selesaikan).');
+    if (S.perpanjanganPending) err.push('Masih ada perpanjangan yang menunggu persetujuan atasan.');
+    const pulang = String(d.pulang || '');
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(pulang)) err.push('Tanggal pulang wajib diisi.');
+    else if (pulang < S.berangkat) err.push('Tanggal pulang lebih awal dari tanggal berangkat.');
+    else if (pulang > p.sampai) err.push('Tanggal pulang melewati tanggal selesai tugas ' + sdr_(p.nama) + ' (' + tglIndo_(keTanggal_(p.sampai)) + '). Ajukan perpanjangan bila memang diperpanjang.');
+    else if (pulang > ymd_(new Date())) err.push('Tanggal pulang belum terjadi.');
+    if (err.length) return { ok: false, error: err };
+    const lama = selisihHari_(S.berangkat, pulang) + 1, saku = lama * Number(param_().UANG_SAKU_HARI), now = new Date();
+    pastikanKolom_(SH.PERSONEL, ['Tgl Pulang Aktual', 'Lama Aktual', 'Uang Saku Dibayar Kasir', 'Keterangan Pulang', 'Lapor Pulang Oleh', 'Lapor Pulang Pada']);
+    const B = bacaBaris_('SPD'), r = B.rows.find(x => x['Nomor SPD'] === S.nomor && String(x['Employee ID']).toUpperCase() === id);
+    ubahBaris_(B, r._row, { 'Tgl Pulang Aktual': keTanggal_(pulang), 'Lama Aktual': lama, 'Uang Saku Dibayar Kasir': saku,
+      'Keterangan Pulang': besar_(d.keterangan).slice(0, 300), 'Lapor Pulang Oleh': u.nama, 'Lapor Pulang Pada': now });
+    SpreadsheetApp.flush();
+    logAksi_('SPD', S.nomor, 'LAPOR PULANG', u.email, p.nama + ' pulang ' + pulang + ' (' + lama + ' hari) — uang saku ' + rpH_(saku) + ' dibayar kasir');
+    hasil = { ok: true, nama: sdr_(p.nama), lama: lama, uangSaku: saku, pulang: pulang, nomor: S.nomor, tempat: S.tempat, email: S.emailPembuat };
+  } finally { lock.releaseLock(); }
+  const admin = String(param_().EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(hasil.email || u.email).toLowerCase();
+  kirimEmail_(pembuat, 'Lapor Pulang Dinas — ' + hasil.nama + ' (' + hasil.nomor + ')',
+    '<p><b>' + escH_(hasil.nama) + '</b> telah pulang dari perjalanan dinas <b>' + escH_(hasil.nomor) + '</b> (' + escH_(hasil.tempat) + ') pada <b>' +
+    escH_(hariIndo_(keTanggal_(hasil.pulang)) + ', ' + tglIndo_(keTanggal_(hasil.pulang))) + '</b> — lama dinas ' + hasil.lama + ' hari.</p>' +
+    '<p>Uang saku <b>' + rpH_(hasil.uangSaku) + '</b> dibayarkan oleh kasir di kantor (tidak termasuk pertanggungjawaban ketua tim). ' +
+    'Karyawan dapat diajukan lembur kembali mulai hari berikutnya.</p><p>Dicatat oleh ' + escH_(sdr_(u.nama)) + '.</p>', admin && admin !== pembuat ? admin : '');
+  return hasil;
+}
+
+/* ============================== PENGINGAT LAPORAN DINAS ============================== */
+/** 1x sehari (dipanggil dari prosesAntrian, mulai jam 08.00): surat dinas yang sudah lewat tanggal kembali
+ *  tetapi belum dipertanggungjawabkan → email pengingat ke ketua tim. */
+function pengingatDinasHarian_() {
+  const P = PropertiesService.getScriptProperties(), hari = ymd_(new Date());
+  if (P.getProperty('PENGINGAT_DINAS') === hari || Number(Utilities.formatDate(new Date(), TZ, 'H')) < 8) return;
+  P.setProperty('PENGINGAT_DINAS', hari);
+  let n = 0;
+  bacaTabel_(SH.SPD, 'Nomor SPD').filter(r => String(r['Status Dinas'] || 'Aktif') === 'Aktif' && r['Tgl Kembali'] instanceof Date && ymd_(r['Tgl Kembali']) < hari)
+    .forEach(r => {
+      try {
+        const S = dataSpd_(r['Nomor SPD']);
+        if (!S || !S.selesaiApproval || S.perpanjanganPending || !S.ketua) return;
+        const k = karyawan_()[S.ketua.id];
+        if (!k || !k.email) return;
+        const lewat = selisihHari_(S.kembali, hari), belum = S.personel.filter(p => p.status === ST.SETUJU && !p.pulang);
+        const err = kirimEmail_(k.email, 'Pengingat Laporan Dinas ' + S.nomor,
+          '<p>Yth. <b>' + escH_(sdr_(k.nama)) + '</b>,</p><p>Perjalanan dinas berikut seharusnya selesai pada <b>' + escH_(hariIndo_(keTanggal_(S.kembali)) + ', ' + tglIndo_(keTanggal_(S.kembali))) +
+          '</b> (' + lewat + ' hari yang lalu), namun laporannya belum diterima.</p>' + tabelRingkasDinas_({ 'Full Name': k.nama, 'Employee ID': k.id, 'Uang Saku': 0 }, induk_('SPD', S.nomor))
+            .replace(/<tr><td[^>]*>Uang Saku<\/td><td[^>]*>[^<]*<\/td><\/tr>/, '').replace('>Personel<', '>Ketua Tim<') +
+          '<p>Mohon segera melaporkan dinas (tanggal pulang, uang kas, biaya &amp; bukti) kepada admin agar Surat Perintah Dinas dapat diselesaikan. ' +
+          'Selama belum dilaporkan, ' + (belum.length > 1 ? 'personel berikut belum dapat diajukan lembur: ' + belum.map(p => escH_(sdr_(p.nama))).join(', ') : 'Anda belum dapat diajukan lembur') + '.</p>');
+        logAksi_('SPD', S.nomor, err ? 'PENGINGAT GAGAL' : 'PENGINGAT LAPORAN', k.email, 'lewat ' + lewat + ' hari' + (err ? ' — ' + err : ''));
+        n++;
+      } catch (e) { logAksi_('SPD', r['Nomor SPD'], 'PENGINGAT GAGAL', '', String(e)); }
+    });
+  return n;
+}

@@ -176,19 +176,26 @@ function suratAktif_(dari, sampai) {
 /** Rentang dinas tiap personel: tgl berangkat s/d berangkat + lama personel − 1 (maks. tgl kembali surat;
  *  personel yang tidak ikut diperpanjang tetap sampai tanggal semula). Surat / personel batal diabaikan. */
 function dinasPersonel_() {
-  const induk = {};
+  const induk = {}, ptj = {};
   bacaTabel_(SH.SPD, 'Nomor SPD').forEach(r => {
     const b = r['Tgl Berangkat'], k = r['Tgl Kembali'];
-    if (b instanceof Date && k instanceof Date && STATUS_BATAL.indexOf(String(r['Status'])) < 0) induk[r['Nomor SPD']] = { b: b, k: ymd_(k) };
+    if (b instanceof Date && k instanceof Date && STATUS_BATAL.indexOf(String(r['Status'])) < 0)
+      induk[r['Nomor SPD']] = { b: b, k: ymd_(k), selesai: ['Selesai', 'Kurang Kas'].indexOf(String(r['Status Dinas'])) >= 0 };
   });
+  // lama aktual dari pertanggungjawaban (surat yang sudah selesai)
+  if (cariSheet_(ss_(), 'Ptj Personel SPD')) bacaTabel_('Ptj Personel SPD', 'Nomor SPD').forEach(r => { ptj[r['Nomor SPD'] + '|' + String(r['Employee ID']).toUpperCase()] = Number(r['Lama Aktual']); });
+  const tambah = (b, n) => ymd_(new Date(b.getTime() + (n - 1) * 864e5));
   const out = [];
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    const I = induk[r['Nomor SPD']];
+    const I = induk[r['Nomor SPD']], id = String(r['Employee ID']).toUpperCase();
     if (!I || STATUS_BATAL.indexOf(String(r['Status'] || '')) >= 0) return;
-    const lama = Number(r['Lama (hari)']) || 0;
-    let akhir = lama ? ymd_(new Date(I.b.getTime() + (lama - 1) * 864e5)) : I.k;
-    if (akhir > I.k) akhir = I.k;
-    out.push({ id: String(r['Employee ID']).toUpperCase(), nomor: r['Nomor SPD'], dari: ymd_(I.b), sampai: akhir });
+    const lama = Number(r['Lama (hari)']) || 0, la = ptj[r['Nomor SPD'] + '|' + id];
+    let akhir;
+    if (r['Tgl Pulang Aktual'] instanceof Date) akhir = ymd_(r['Tgl Pulang Aktual']);                 // sudah lapor pulang
+    else if (I.selesai) akhir = la > 0 ? tambah(I.b, la) : la === 0 ? '' : I.k;                          // sudah dipertanggungjawabkan
+    else if (String(r['Status']) === ST.SETUJU) akhir = '9999-12-31';                                    // dinas berjalan: terkunci sampai dilaporkan
+    else { akhir = lama ? tambah(I.b, lama) : I.k; if (akhir > I.k) akhir = I.k; }                      // masih proses persetujuan: sesuai rencana
+    if (akhir) out.push({ id: id, nomor: r['Nomor SPD'], dari: ymd_(I.b), sampai: akhir });
   });
   return out;
 }
