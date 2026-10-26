@@ -30,23 +30,47 @@ function antri_(tugas) {
   } finally { lock.releaseLock(); }
 }
 
-/** Dipanggil pemicu waktu setiap 1 menit. */
+/** Dipanggil pemicu waktu setiap 1 menit.
+ *  Gangguan sesaat server Google ("server error… try again") ditangkap & dicatat di Log (bukan email kegagalan);
+ *  tugas diambil SATU per SATU dari antrian sehingga bila eksekusi terhenti, tugas lain tetap tersimpan,
+ *  dan tugas yang gagal dicoba ulang (maks. 3x) pada menit berikutnya. */
 function prosesAntrian() {
-  const P = PropertiesService.getScriptProperties();
-  P.setProperty(ANTRIAN_DETAK, String(Date.now()));
-  try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
+  const mulai = Date.now();
+  try {
+    const P = PropertiesService.getScriptProperties();
+    P.setProperty(ANTRIAN_DETAK, String(Date.now()));
+    try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
+    while (Date.now() - mulai < 4 * 60 * 1000) {   // sisa antrian dilanjutkan pada menit berikutnya
+      const t = ambilTugas_(P);
+      if (!t) return;
+      try { _K = null; _P = null; jalankanTugas_(t); }
+      catch (e) {
+        t.coba = (t.coba || 0) + 1;
+        logAksi_(t.jenis || 'SPL', t.nomor || t.id || '-', t.coba < 3 ? 'ANTRIAN DIULANG' : 'ANTRIAN GAGAL', '', t.t + ' (percobaan ' + t.coba + '): ' + String(e));
+        if (t.coba < 3) kembalikanTugas_(P, t);
+        return;   // beri jeda — coba lagi menit berikutnya
+      }
+    }
+  } catch (e) {
+    try { console.warn('prosesAntrian: ' + e); } catch (x) {}   // gangguan sesaat server Google — dicoba lagi menit berikutnya
+  }
+}
+function ambilTugas_(P) {
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(20000)) return null;
+  try {
+    const q = JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]');
+    if (!q.length) return null;
+    const t = q.shift();
+    P.setProperty(ANTRIAN_KEY, JSON.stringify(q));
+    return t;
+  } finally { lock.releaseLock(); }
+}
+function kembalikanTugas_(P, t) {
   const lock = LockService.getScriptLock();
   if (!lock.tryLock(20000)) return;
-  let q;
-  try {
-    q = JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]');
-    if (!q.length) return;
-    P.setProperty(ANTRIAN_KEY, '[]');
-  } finally { lock.releaseLock(); }
-  q.forEach(t => {
-    try { _K = null; _P = null; jalankanTugas_(t); }
-    catch (e) { logAksi_(t.jenis || 'SPL', t.nomor || t.id || '-', 'ANTRIAN GAGAL', '', t.t + ': ' + String(e)); }
-  });
+  try { const q = JSON.parse(P.getProperty(ANTRIAN_KEY) || '[]'); q.push(t); P.setProperty(ANTRIAN_KEY, JSON.stringify(q)); }
+  finally { lock.releaseLock(); }
 }
 
 function jalankanTugas_(t) {
