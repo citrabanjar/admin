@@ -289,7 +289,7 @@
         <div class="card" style="padding:0">
           <div class="sek" style="padding:14px 16px 0">D. Biaya Lainnya (Realisasi)</div>
           <table class="mob">
-            <thead><tr><th>No</th><th style="min-width:170px">Jenis Biaya</th><th style="min-width:200px">Uraian</th><th style="min-width:130px">Jumlah (Rp)</th><th>Bukti</th><th></th></tr></thead>
+            <thead><tr><th>No</th><th style="min-width:170px">Jenis Biaya</th><th style="min-width:200px">Uraian</th><th style="min-width:130px">Jumlah (Rp)</th><th style="min-width:190px">Bukti</th><th></th></tr></thead>
             <tbody id="tBia"></tbody>
           </table>
           <div style="padding:0 16px 14px"><button class="btn sec kecil" onclick="ptjTambahBiaya()">+ Tambah biaya</button></div>
@@ -804,9 +804,48 @@ function ptjTambahBiaya(b) {
     '<td data-l="Jenis Biaya"><select class="j" onchange="hitungPtj()">' + opsi(D.pilihan.jenisBiaya, b.jenis || '', '— pilih —') + '</select><div class="rowerr"></div></td>' +
     '<td data-l="Uraian"><input class="ur" value="' + esc(b.uraian || '') + '"></td>' +
     '<td class="half" data-l="Jumlah (Rp)"><input class="jm" type="text" inputmode="numeric" autocomplete="off" value="' + (b.jumlah != null && b.jumlah !== '' ? Number(b.jumlah).toLocaleString('id-ID') : '') + '" oninput="fmtRp(this);hitungPtj()"></td>' +
-    '<td class="half" data-l="Bukti"><select class="bk">' + opsi(D.pilihan.bukti, b.bukti || '') + '</select></td>' +
+    '<td class="half" data-l="Bukti"><input type="file" class="bf" accept="image/*,application/pdf" style="display:none" onchange="ptjUnggah(' + id + ',this)">' +
+      '<button type="button" class="btn sec kecil bu" onclick="this.previousElementSibling.click()">📎 Upload bukti</button><div class="bn sub" style="margin:4px 0"></div>' +
+      '<label class="cek bt" style="min-height:30px"><input type="checkbox" class="tb" onchange="ptjTanpa(' + id + ')"> Tidak ada bukti</label></td>' +
     '<td class="aksi"><button class="del" title="Hapus" onclick="ptjHapusBiaya(' + id + ')">✕</button></td>';
-  $('tBia').appendChild(tr); TBROWS.push({ id: id, el: tr }); hitungPtj();
+  $('tBia').appendChild(tr); TBROWS.push({ id: id, el: tr, link: '', sibuk: false }); hitungPtj();
+}
+/** Foto diperkecil dulu (maks 1600 px, JPEG) agar upload cepat; PDF dikirim apa adanya (maks 10 MB). */
+function siapkanBukti(file) {
+  return new Promise((res, rej) => {
+    const baca = f => { const r = new FileReader(); r.onload = () => res({ b64: String(r.result).split(',')[1], mime: f.type || 'application/pdf', nama: f.name }); r.onerror = () => rej(new Error('File tidak bisa dibaca.')); r.readAsDataURL(f); };
+    if (!/^image\/(jpeg|png|webp)$/i.test(file.type)) { if (file.size > 10 * 1024 * 1024) return rej(new Error('Ukuran file maksimal 10 MB.')); return baca(file); }
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      const k = Math.min(1, 1600 / Math.max(img.width, img.height)), c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height); URL.revokeObjectURL(url);
+      res({ b64: c.toDataURL('image/jpeg', 0.8).split(',')[1], mime: 'image/jpeg', nama: file.name.replace(/\.\w+$/, '') + '.jpg' });
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); baca(file); };
+    img.src = url;
+  });
+}
+async function ptjUnggah(id, inp) {
+  const r = TBROWS.find(x => x.id === id), f = inp.files && inp.files[0];
+  if (!r || !f) return;
+  const bn = r.el.querySelector('.bn');
+  r.sibuk = true; r.link = ''; bn.innerHTML = '<span class="spin" style="border-color:#BE353F;border-right-color:transparent"></span>Mengunggah…'; r.el.querySelector('.bu').disabled = true; hitungPtj();
+  try {
+    const d = await siapkanBukti(f), h = await run('unggahBuktiPtj', TOKEN, PT.nomor, d.nama, d.mime, d.b64);
+    r.link = h.url; r.el.querySelector('.tb').checked = false;
+    bn.innerHTML = '✅ <a href="' + esc(h.url) + '" target="_blank">' + esc(h.nama) + '</a>';
+  } catch (e) { if (!sesiHabis(e)) bn.innerHTML = '<span style="color:var(--err,#B42318)">' + esc(errText(e)) + '</span>'; }
+  r.sibuk = false; inp.value = ''; ptjTanpa(id);
+}
+function ptjTanpa(id) {
+  const r = TBROWS.find(x => x.id === id); if (!r) return;
+  const tanpa = r.el.querySelector('.tb').checked;
+  r.el.querySelector('.bu').disabled = tanpa || r.sibuk;
+  r.el.querySelector('.bu').textContent = r.link ? '📎 Ganti bukti' : '📎 Upload bukti';
+  r.el.querySelector('.bt').style.display = r.link ? 'none' : '';
+  if (tanpa) r.el.querySelector('.bn').innerHTML = '';
+  hitungPtj();
 }
 function ptjHapusBiaya(id) { TBROWS = TBROWS.filter(r => r.id !== id); $('t' + id).remove(); hitungPtj(); }
 let PTJ_OK = false;
@@ -832,6 +871,8 @@ function hitungPtj() {
     el.querySelector('.n').textContent = i + 1;
     if (jm && !j) er.push('Pilih jenis biaya.');
     if (j && jm === '') er.push('Isi jumlah.');
+    if (r.sibuk) er.push('Tunggu upload bukti selesai.');
+    else if (j && !r.link && !el.querySelector('.tb').checked) er.push('Upload bukti atau pilih "Tidak ada bukti".');
     el.querySelector('.rowerr').textContent = er.join(' ');
     if (er.length) e.push('Periksa baris biaya.');
     lain += Number(jm) || 0;
@@ -848,7 +889,8 @@ function ptjData() {
   return {
     nomor: PT.nomor, berangkat: $('tBrk').value, kembali: $('tKmb').value, ringkasan: $('tRingkas').value, pengesahan: $('tSah').checked,
     personel: [...document.querySelectorAll('#tPer tr[data-id]')].map(tr => ({ id: tr.dataset.id, lama: Number(tr.querySelector('.lm').value), keterangan: tr.querySelector('.ket').value })),
-    biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(nilaiRp(r.el.querySelector('.jm'))) || 0, bukti: r.el.querySelector('.bk').value })).filter(x => x.jenis)
+    biaya: TBROWS.map(r => ({ jenis: r.el.querySelector('.j').value, uraian: r.el.querySelector('.ur').value, jumlah: Number(nilaiRp(r.el.querySelector('.jm'))) || 0,
+      link: r.link, tanpa: r.el.querySelector('.tb').checked })).filter(x => x.jenis)
   };
 }
 function ptjKonfirmasi() {

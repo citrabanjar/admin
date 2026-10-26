@@ -17,7 +17,7 @@ const KOLOM_PTJ = {
     'Uang Kas Perjalanan', 'Uang Kas Dikembalikan',
     'Dilaporkan Oleh', 'Dilaporkan Pada', 'Link PDF'],
   'Ptj Personel SPD': ['Nomor SPD', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'],
-  'Ptj Biaya SPD': ['Nomor SPD', 'No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti']
+  'Ptj Biaya SPD': ['Nomor SPD', 'No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti', 'Link Bukti']
 };
 
 function sheetPtj_(nama) {
@@ -69,6 +69,18 @@ function spdOpen(token) {
     .sort((a, b) => (a.berangkat < b.berangkat ? -1 : 1));
 }
 
+/** Upload 1 file bukti biaya (foto / PDF) dari form pertanggungjawaban → Drive "Bukti Dinas/<nomor>". */
+function unggahBuktiPtj(token, nomor, nama, mime, b64) {
+  const u = sesiCek_(token);
+  cekAkses_(u, 'PTJ');
+  if (!/^(image\/(jpeg|png|webp|gif|heic|heif)|application\/pdf)$/i.test(String(mime || ''))) throw new Error('File bukti harus berupa foto (JPG/PNG) atau PDF.');
+  if (!b64 || String(b64).length > 14e6) throw new Error('Ukuran file bukti maksimal 10 MB.');
+  const induk = folderPdf_('Bukti Dinas'), sub = String(nomor || 'lainnya').replace(/\s*\/\s*/g, '-').replace(/[^\w.-]/g, '');
+  const it = induk.getFoldersByName(sub), folder = it.hasNext() ? it.next() : induk.createFolder(sub);
+  const file = folder.createFile(Utilities.newBlob(Utilities.base64Decode(b64), mime, String(nama || 'bukti').slice(0, 120)));
+  return { url: file.getUrl(), nama: file.getName() };
+}
+
 /**
  * Simpan pertanggungjawaban.
  * d = {nomor, berangkat, kembali, ringkasan, pengesahan:boolean,
@@ -106,6 +118,7 @@ function simpanPtjSPD(token, d) {
     biaya.forEach((b, i) => {
       if (!String(b.jenis || '').trim()) err.push('Biaya ke-' + (i + 1) + ': jenis biaya wajib dipilih.');
       if (!(Number(b.jumlah) >= 0)) err.push('Biaya ke-' + (i + 1) + ': jumlah tidak valid.');
+      if (!b.link && !b.tanpa) err.push('Biaya ke-' + (i + 1) + ': upload bukti atau pilih "Tidak ada bukti".');
     });
     if (err.length) return { ok: false, error: err };
 
@@ -132,7 +145,7 @@ function simpanPtjSPD(token, d) {
     tulisBaris_(SH_PTJ.PERSONEL, per.map(p => ({ 'Nomor SPD': S.nomor, 'Employee ID': p.ref.id, 'Full Name': p.ref.nama, 'Lama Rencana': p.ref.lama,
       'Lama Aktual': p.lama, 'Uang Saku Rencana': p.ref.uangSaku, 'Uang Saku Realisasi': p.uangSaku, 'Keterangan': p.keterangan })));
     tulisBaris_(SH_PTJ.BIAYA, biaya.map((b, i) => ({ 'Nomor SPD': S.nomor, 'No': i + 1, 'Jenis Biaya': String(b.jenis).trim(),
-      'Uraian': String(b.uraian || '').trim(), 'Jumlah (Rp)': Number(b.jumlah) || 0, 'Bukti': String(b.bukti || '') })));
+      'Uraian': String(b.uraian || '').trim(), 'Jumlah (Rp)': Number(b.jumlah) || 0, 'Bukti': b.link ? 'Ada' : 'Tidak Ada', 'Link Bukti': String(b.link || '') })));
 
     // tutup Surat Perintah Dinas
     pastikanKolom_(SH.SPD, ['Tgl Laporan', 'Total Realisasi', 'Selisih', 'Uang Kas Dikembalikan', 'Link PDF Laporan']);
@@ -182,7 +195,7 @@ function buatPdfPtj_(S, R) {
     totRow('TOTAL UANG SAKU REALISASI', 6, rpH_(R.sakuReal), 1) + '</table>' +
     sek('D. BIAYA PERJALANAN DINAS LAINNYA (REALISASI)') +
     (R.biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
-      R.biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b.jenis)) + tdP_(escH_(b.uraian)) + tdP_(rpH_(b.jumlah), 'text-align:right') + tdP_(escH_(b.bukti), 'text-align:center') + '</tr>').join('') +
+      R.biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b.jenis)) + tdP_(escH_(b.uraian)) + tdP_(rpH_(b.jumlah), 'text-align:right') + tdP_(b.link ? '<a href="' + escH_(b.link) + '" style="color:#1F5FBF">Ada (lihat)</a>' : 'Tidak ada', 'text-align:center') + '</tr>').join('') +
       totRow('TOTAL BIAYA LAINNYA', 3, rpH_(R.lainReal), 1) + '</table>' : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
     sek('E. PERHITUNGAN UANG KAS DALAM PERJALANAN') +
     '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
