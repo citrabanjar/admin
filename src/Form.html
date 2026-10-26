@@ -800,7 +800,9 @@ function perpanjangModal(nomor) {
     '<label>Tanggal kembali baru *</label><input id="mKmb" type="date" min="' + ymd_(new Date(keTanggal_(x.kembali).getTime() + 864e5)) + '">' +
     '<label style="margin-top:10px">Alasan perpanjangan *</label><textarea id="mAlasan" rows="3"></textarea>' +
     '<label style="margin-top:10px">Personel yang diperpanjang *</label>' +
-    per.map(p => '<label class="cek" style="margin-bottom:6px"><input type="checkbox" class="mPer" value="' + esc(p.id) + '" checked> ' + esc(p.nama) + ' <span class="sub">' + esc(p.id) + '</span></label>').join('') +
+    per.map(p => p.masihTugas === false
+      ? '<label class="cek kunci" style="margin-bottom:6px"><input type="checkbox" disabled> ' + esc(p.nama) + ' <span class="sub">sudah selesai bertugas ' + tglPendek(p.sampai) + '</span></label>'
+      : '<label class="cek" style="margin-bottom:6px"><input type="checkbox" class="mPer" value="' + esc(p.id) + '" checked> ' + esc(p.nama) + ' <span class="sub">' + esc(p.id) + '</span></label>').join('') +
     '<p class="sub">Persetujuan dikirim ke atasan masing-masing personel; owner mendapat pemberitahuan. Setelah disetujui, PDF surat direvisi.</p><div id="mErr"></div>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Batal</button><button class="btn" id="bYa" onclick="kirimPerpanjang(\'' + esc(x.nomor).replace(/'/g, "\\'") + '\')">Ajukan</button></div>');
 }

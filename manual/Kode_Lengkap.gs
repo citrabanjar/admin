@@ -2266,6 +2266,9 @@ function dataSpd_(nomor) {
     jenis: r['Jenis Biaya'], uraian: r['Uraian'], jumlah: Number(r['Jumlah (Rp)']) || 0, bukti: r['Bukti']
   }));
   const ubah = perubahanSpd_(nomor);
+  // tanggal selesai tugas tiap personel (berangkat + lama − 1); yang tidak ikut diperpanjang selesai lebih awal
+  const brk = tgl(I['Tgl Berangkat']), kmb = tgl(I['Tgl Kembali']);
+  per.forEach(p => { const a = brk && p.lama ? ymd_(new Date(keTanggal_(brk).getTime() + (p.lama - 1) * 864e5)) : kmb; p.sampai = a > kmb ? kmb : a; p.masihTugas = p.sampai === kmb; });
   const selesaiApproval = per.length > 0 && per.every(p => ST_FINAL.indexOf(p.status) >= 0);
   const disetujui = per.filter(p => p.status === ST.SETUJU);
   return {
@@ -2552,6 +2555,7 @@ function ajukanPerpanjangan(token, d) {
     if (!alasan) err.push('Alasan perpanjangan wajib diisi.');
     const setuju = {}; S.personel.filter(p => p.status === ST.SETUJU).forEach(p => setuju[p.id] = p);
     const ids = [...new Set((d.ids || []).map(x => String(x).toUpperCase()))].filter(x => setuju[x]);
+    ids.filter(x => !setuju[x].masihTugas).forEach(x => err.push(sdr_(setuju[x].nama) + ' sudah selesai bertugas (' + tglIndo_(keTanggal_(setuju[x].sampai)) + ') — tidak dapat diperpanjang.'));
     if (!ids.length) err.push('Pilih minimal 1 personel yang diperpanjang.');
     if (!err.length) {
       const aktif = suratAktif_(tambahHari_(S.kembali, 1), d.kembali);

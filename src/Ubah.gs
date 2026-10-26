@@ -98,6 +98,7 @@ function ajukanPerpanjangan(token, d) {
     if (!alasan) err.push('Alasan perpanjangan wajib diisi.');
     const setuju = {}; S.personel.filter(p => p.status === ST.SETUJU).forEach(p => setuju[p.id] = p);
     const ids = [...new Set((d.ids || []).map(x => String(x).toUpperCase()))].filter(x => setuju[x]);
+    ids.filter(x => !setuju[x].masihTugas).forEach(x => err.push(sdr_(setuju[x].nama) + ' sudah selesai bertugas (' + tglIndo_(keTanggal_(setuju[x].sampai)) + ') — tidak dapat diperpanjang.'));
     if (!ids.length) err.push('Pilih minimal 1 personel yang diperpanjang.');
     if (!err.length) {
       const aktif = suratAktif_(tambahHari_(S.kembali, 1), d.kembali);

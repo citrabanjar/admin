@@ -44,6 +44,9 @@ function dataSpd_(nomor) {
     jenis: r['Jenis Biaya'], uraian: r['Uraian'], jumlah: Number(r['Jumlah (Rp)']) || 0, bukti: r['Bukti']
   }));
   const ubah = perubahanSpd_(nomor);
+  // tanggal selesai tugas tiap personel (berangkat + lama − 1); yang tidak ikut diperpanjang selesai lebih awal
+  const brk = tgl(I['Tgl Berangkat']), kmb = tgl(I['Tgl Kembali']);
+  per.forEach(p => { const a = brk && p.lama ? ymd_(new Date(keTanggal_(brk).getTime() + (p.lama - 1) * 864e5)) : kmb; p.sampai = a > kmb ? kmb : a; p.masihTugas = p.sampai === kmb; });
   const selesaiApproval = per.length > 0 && per.every(p => ST_FINAL.indexOf(p.status) >= 0);
   const disetujui = per.filter(p => p.status === ST.SETUJU);
   return {
