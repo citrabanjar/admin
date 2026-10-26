@@ -823,6 +823,19 @@ function dinasPersonel_() {
   });
   return out;
 }
+
+/** Unduh PDF surat / rekap / laporan lewat sistem (file Drive tetap privat).
+ *  Lembur: hanya surat yang dibuat user ini. Dinas & pertanggungjawaban: admin berakses Dinas / Res Dinas. */
+function unduhPdf(token, url) {
+  const u = sesiCek_(token), m = String(url || '').match(/\/d\/([\w-]{20,})/);
+  if (!m) throw new Error('Link PDF tidak valid.');
+  const em = String(u.email).toLowerCase();
+  const milikSpl = bacaTabel_(SH.SPL, 'Nomor SPL').some(r => String(r['Email Pembuat']).toLowerCase() === em && r['Link PDF'] === url);
+  const dinas = (punyaAkses_(u, 'DINAS') || punyaAkses_(u, 'PTJ')) && bacaTabel_(SH.SPD, 'Nomor SPD').some(r => r['Link PDF'] === url || r['Link PDF Laporan'] === url);
+  if (!milikSpl && !dinas) throw new Error('Anda tidak berhak mengunduh PDF ini.');
+  const f = DriveApp.getFileById(m[1]);
+  return { nama: f.getName(), b64: Utilities.base64Encode(f.getBlob().getBytes()) };
+}
 /**
  * =====================================================================
  *  SISTEM SPL & SPD — File : Spl.gs
@@ -1497,7 +1510,7 @@ function cekSelesai_(jenis, nomor, paksa) {
     : ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> dinas.';
   const isi = '<p>Rekap <b>' + J.surat + ' ' + escH_(nomor) + '</b> — ' + escH_(ringkasTanggal_(jenis, rows[0], I)) + '.</p><p>' + ringkas +
     (belum.length ? ' <i>(' + belum.length + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
-    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
+    '<p>PDF terlampir.</p>';
   const admin = String(param_().EMAIL_ADMIN || '').trim().toLowerCase();
   const pembuat = String(I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, 'PDF ' + jenis + ' ' + nomor + ' — ' + ringkasTanggal_(jenis, rows[0], I), isi, admin && admin !== pembuat ? admin : '', pdf);
@@ -1633,7 +1646,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
     escH_(ringkasStatus_(rows.filter(r => r['Status'] !== ST.TIDAK))) + (rows.some(r => r['Status'] === ST.TIDAK) ? ' · TIDAK BERSEDIA ' + rows.filter(r => r['Status'] === ST.TIDAK).length + ' orang' : '') +
     (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
     (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
-    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>' +
+    '<p>PDF terlampir.</p>' +
     (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
       tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '');
   const err = kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);

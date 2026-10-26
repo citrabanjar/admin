@@ -428,7 +428,7 @@ function cekSelesai_(jenis, nomor, paksa) {
     : ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> dinas.';
   const isi = '<p>Rekap <b>' + J.surat + ' ' + escH_(nomor) + '</b> — ' + escH_(ringkasTanggal_(jenis, rows[0], I)) + '.</p><p>' + ringkas +
     (belum.length ? ' <i>(' + belum.length + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
-    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
+    '<p>PDF terlampir.</p>';
   const admin = String(param_().EMAIL_ADMIN || '').trim().toLowerCase();
   const pembuat = String(I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, 'PDF ' + jenis + ' ' + nomor + ' — ' + ringkasTanggal_(jenis, rows[0], I), isi, admin && admin !== pembuat ? admin : '', pdf);
@@ -564,7 +564,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
     escH_(ringkasStatus_(rows.filter(r => r['Status'] !== ST.TIDAK))) + (rows.some(r => r['Status'] === ST.TIDAK) ? ' · TIDAK BERSEDIA ' + rows.filter(r => r['Status'] === ST.TIDAK).length + ' orang' : '') +
     (owner ? ', estimasi kompensasi ' + rpH_(ok.reduce((s, r) => s + (Number(r['Estimasi Kompensasi']) || 0), 0)) : '') + '.' +
     (belum ? ' <i>(' + belum + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
-    '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>' +
+    '<p>PDF terlampir.</p>' +
     (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
       tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '');
   const err = kirimEmail_(ke, (revisi ? '[DIPERBARUI] ' : '') + 'Rekap Surat Perintah Lembur — ' + tgl + (label ? ' (' + label + ')' : ''), isi, '', pdf);

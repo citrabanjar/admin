@@ -1039,7 +1039,7 @@ async function ptjKirim() {
     modal('<h3 style="margin-top:0;color:var(--ok)">✅ Pertanggungjawaban tersimpan</h3><p><b>' + esc(r.nomor) + '</b> — status <span class="st ' + (r.kasKembali < 0 ? 'DITOLAK' : 'SELESAI') + '">' + esc(r.status) + '</span></p>' +
       '<p>Uang kas ' + rp(r.uangKas) + ' − biaya lainnya ' + rp(r.biayaLain) + (ptjData().sakuDariKas ? ' − uang saku ' + rp(r.uangSaku) : '') + '<br>' +
       (r.kasKembali < 0 ? 'Kekurangan kas (dipotong dari gaji ketua tim ' + esc(r.ketua) + ') ' : 'Uang kas harus dikembalikan ') + '<b>' + rp(Math.abs(r.kasKembali)) + '</b></p>' +
-      '<p><a href="' + esc(r.pdf) + '" target="_blank">📄 Buka PDF laporan</a></p>' +
+      '<p><a href="#" onclick="unduhPdf(this,\'' + esc(r.pdf) + '\');return false">📄 Unduh PDF laporan</a></p>' +
       '<div class="bar" style="justify-content:flex-end"><button class="btn" onclick="tutupModal();tutupPtj();muatOpen()">Selesai</button></div>');
   } catch (e) { tutupModal(); if (!sesiHabis(e)) pesan('tErr', 'err', esc(errText(e))); }
 }
@@ -1056,6 +1056,17 @@ async function muatRiwayat() {
   } catch (e) { if (!sesiHabis(e)) ['riwayat', 'homeRiwayat'].forEach(i => $(i).innerHTML = '<div class="msg err">' + esc(errText(e)) + '</div>'); }
 }
 function filterRw(f) { FRW = f; document.querySelectorAll('#fRw button').forEach(b => b.classList.toggle('on', b.dataset.f === f)); tampilRiwayat(); }
+/** PDF di Drive bersifat privat → diunduh lewat sistem (tanpa perlu akses Google Drive) */
+async function unduhPdf(a, url) {
+  const t = a.textContent; a.textContent = '⏳ Mengunduh…';
+  try {
+    const r = await run('unduhPdf', TOKEN, url);
+    const bin = atob(r.b64), u8 = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    const href = URL.createObjectURL(new Blob([u8], { type: 'application/pdf' })), l = document.createElement('a');
+    l.href = href; l.download = r.nama; document.body.appendChild(l); l.click(); l.remove(); setTimeout(() => URL.revokeObjectURL(href), 60000);
+  } catch (e) { if (!sesiHabis(e)) alert(errText(e)); }
+  a.textContent = t;
+}
 function kartu(x) {
   const kelas = String(x.status).split(' ')[0];
   let info, det;
@@ -1064,13 +1075,13 @@ function kartu(x) {
     det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
       (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '') +
       (o.batalOleh ? '<div class="sub" style="margin-left:12px">Dibatalkan oleh <b>' + esc(o.batalOleh) + '</b>' + (o.alasanBatal ? ' — ' + esc(o.alasanBatal) : '') + '</div>' : '')).join('<br>') +
-      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF</a>' : '');
+      (x.pdf ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdf) + '\');return false">📄 Unduh PDF</a>' : '');
   } else {
-    info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · ' + rp(x.totalBiaya);
+    info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · kas ' + rp(x.uangKas || 0);
     det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '') +
       (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
-      (x.pdf ? '<br><a href="' + esc(x.pdf) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka PDF surat</a>' : '') +
-      (x.pdfLaporan ? '<br><a href="' + esc(x.pdfLaporan) + '" target="_blank" onclick="event.stopPropagation()">📄 Buka laporan pertanggungjawaban</a>' : '');
+      (x.pdf ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdf) + '\');return false">📄 Unduh PDF surat</a>' : '') +
+      (x.pdfLaporan ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdfLaporan) + '\');return false">📄 Unduh laporan pertanggungjawaban</a>' : '');
   }
   return '<div class="rw" onclick="this.classList.toggle(\'buka\')"><div class="bar" style="margin:0"><div><span class="jn ' + x.jenis + '">' + LABEL_JENIS[x.jenis] + '</span><b>' + esc(x.nomor) +
     '</b><div class="sub">' + info + '</div></div><div>' + (x.statusDinas ? '<span class="st ' + (x.statusDinas === 'OPEN' ? 'MENUNGGU' : 'SELESAI') + '" title="Status pertanggungjawaban">' + x.statusDinas + '</span> ' : '') + '<span class="st ' + esc(kelas) + '">' + esc(x.status) + '</span></div></div><div class="det">' + det + '</div></div>';

@@ -199,3 +199,16 @@ function dinasPersonel_() {
   });
   return out;
 }
+
+/** Unduh PDF surat / rekap / laporan lewat sistem (file Drive tetap privat).
+ *  Lembur: hanya surat yang dibuat user ini. Dinas & pertanggungjawaban: admin berakses Dinas / Res Dinas. */
+function unduhPdf(token, url) {
+  const u = sesiCek_(token), m = String(url || '').match(/\/d\/([\w-]{20,})/);
+  if (!m) throw new Error('Link PDF tidak valid.');
+  const em = String(u.email).toLowerCase();
+  const milikSpl = bacaTabel_(SH.SPL, 'Nomor SPL').some(r => String(r['Email Pembuat']).toLowerCase() === em && r['Link PDF'] === url);
+  const dinas = (punyaAkses_(u, 'DINAS') || punyaAkses_(u, 'PTJ')) && bacaTabel_(SH.SPD, 'Nomor SPD').some(r => r['Link PDF'] === url || r['Link PDF Laporan'] === url);
+  if (!milikSpl && !dinas) throw new Error('Anda tidak berhak mengunduh PDF ini.');
+  const f = DriveApp.getFileById(m[1]);
+  return { nama: f.getName(), b64: Utilities.base64Encode(f.getBlob().getBytes()) };
+}
