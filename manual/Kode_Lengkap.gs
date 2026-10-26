@@ -1207,7 +1207,6 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
     ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
-    ['Uang Saku', rpH_(r['Uang Saku'])],
   ].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
@@ -1254,7 +1253,7 @@ function kirimKonfirmasi_(jenis, nomor) {
 function tabelRingkasDinas_(r, I) {
   const baris = [['Nomor SPD', I['Nomor SPD']], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
     ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
-    ['Transportasi', I['Transportasi']], ['Uang Saku', rpH_(r['Uang Saku'])]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
+    ['Transportasi', I['Transportasi']]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
     [['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
     escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
@@ -1316,7 +1315,7 @@ function halamanGrupDinas_(p) {
     isi = '<h2>Persetujuan Dinas Luar</h2>' + tabelDetail_('SPD', r0, I, false, true).replace(/width:150px/g, 'width:130px') +
       '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="text-align:left;padding:6px;background:#F4F5F7">Nama Karyawan</th><th style="padding:6px;background:#F4F5F7">Status</th></tr>' +
       G.rows.map(x => '<tr><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div class="sub">' + escH_(x['Employee ID']) + (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') +
-        ' · ' + rpH_(x['Uang Saku']) + '</div></td><td style="' + td + ';font-size:11px;text-align:center">' + escH_(x['Status']) + '</td></tr>').join('') + '</table>';
+        '</div></td><td style="' + td + ';font-size:11px;text-align:center">' + escH_(x['Status']) + '</td></tr>').join('') + '</table>';
     if (!aktif.length) {
       isi += '<div class="msg info">Sudah diproses seluruhnya.</div>';
     } else {
@@ -1495,7 +1494,7 @@ function cekSelesai_(jenis, nomor, paksa) {
   const ok = rows.filter(r => r['Status'] === ST.SETUJU);
   const ringkas = jenis === 'SPL'
     ? ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> lembur, total ' + String(ok.reduce((s, r) => s + (Number(r['Jam Efektif']) || 0), 0)).replace('.', ',') + ' jam.'
-    : ok.length + ' dari ' + rows.length + ' personel <b>disetujui</b> dinas, uang saku ' + rpH_(ok.reduce((s, r) => s + (Number(r['Uang Saku']) || 0), 0)) + '.';
+    : ok.length + ' dari ' + rows.length + ' karyawan <b>disetujui</b> dinas.';
   const isi = '<p>Rekap <b>' + J.surat + ' ' + escH_(nomor) + '</b> — ' + escH_(ringkasTanggal_(jenis, rows[0], I)) + '.</p><p>' + ringkas +
     (belum.length ? ' <i>(' + belum.length + ' orang belum selesai diproses saat PDF ini dibuat)</i>' : '') + '</p>' +
     '<p>PDF terlampir dan tersimpan di Google Drive: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
@@ -1854,10 +1853,9 @@ function kirimPersetujuanDinas_(nomor, paksa) {
       const isi = (a ? '<p>Yth. <b>' + escH_(sdr_(a.nama)) + '</b>,</p>' : '<p><i>Atasan karyawan belum diisi di Data Karyawan, sehingga permintaan persetujuan dikirim ke admin.</i></p>') +
         '<p>Personel berikut telah menyatakan <b style="color:#1E7B4A">BERSEDIA</b> melaksanakan perjalanan dinas. Mohon persetujuan Anda:</p>' +
         tabelDetail_('SPD', kirim[0], I, false, true) +
-        '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="' + th + '">No</th><th style="' + th + '">Nama Karyawan</th><th style="' + th + '">Uang Saku</th></tr>' +
+        '<table style="border-collapse:collapse;width:100%;font-size:13px;margin-top:12px"><tr><th style="' + th + '">No</th><th style="' + th + '">Nama Karyawan</th></tr>' +
         kirim.map((x, i) => '<tr><td style="' + td + ';text-align:center">' + (i + 1) + '</td><td style="' + td + '"><b>' + escH_(sdr_(x['Full Name'])) + '</b><div style="font-size:11px;color:#6B6F76">' + escH_(x['Employee ID']) +
-          (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + ' · ' + escH_(x['Lama (hari)']) + ' hari' + (x['Keterangan'] ? ' — ' + escH_(x['Keterangan']) : '') + '</div></td>' +
-          '<td style="' + td + ';white-space:nowrap">' + rpH_(x['Uang Saku']) + '</td></tr>').join('') + '</table>' +
+          (x['Job Position'] ? ' — ' + escH_(x['Job Position']) : '') + ' · ' + escH_(x['Lama (hari)']) + ' hari' + (x['Keterangan'] ? ' — ' + escH_(x['Keterangan']) : '') + '</div></td></tr>').join('') + '</table>' +
         '<p style="margin-top:18px">' + tombol_(linkAksi_('dg', kirim.map(x => x['ID Baris']).join('.'), 'ya'), '✅ Setujui', '#1E7B4A') +
         tombol_(linkAksi_('dg', kirim.map(x => x['ID Baris']).join('.'), 'tidak'), '❌ Tolak', '#B42318') + '</p>';
       const err = kirimEmail_(ke, 'Persetujuan Dinas Luar — ' + (kirim.length > 1 ? kirim.length + ' personel' : sdr_(kirim[0]['Full Name'])) + ' (' + ringkasTanggal_('SPD', kirim[0], I) + ')', isi);
