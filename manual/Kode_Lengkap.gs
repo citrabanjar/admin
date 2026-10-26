@@ -1222,10 +1222,22 @@ function kirimKonfirmasi_(jenis, nomor) {
       : '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>') +
       tabelDetail_(jenis, r, Ir, true) + '<p style="margin-top:18px">' +
       tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
+    // Surat Perintah Dinas: format ringkas yang terbukti tidak ditolak Gmail (uji 26/10: judul netral, tanpa kalimat "Anda mendapat… mohon konfirmasi")
+    const dinas = jenis === 'SPD' && !keAdmin;
     const err = kirimEmail_(keAdmin ? Ir['Email Pembuat'] : k.email,
-      'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + sdr_(r['Full Name']) : ''), isi);
+      dinas ? 'Surat Perintah Dinas ' + nomor : 'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_(jenis, r, Ir) + (keAdmin ? ' — atas nama ' + sdr_(r['Full Name']) : ''),
+      dinas ? '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p>' + tabelRingkasDinas_(r, Ir) + '<p style="margin-top:18px">' +
+        tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>' : isi);
     ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Konfirmasi terkirim ke ' + (keAdmin ? 'admin ' : '') + (keAdmin ? Ir['Email Pembuat'] : k.email) + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
   });
+}
+/** Tabel ringkas Surat Perintah Dinas untuk email ke karyawan */
+function tabelRingkasDinas_(r, I) {
+  const baris = [['Nomor SPD', I['Nomor SPD']], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
+    ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
+    ['Transportasi', I['Transportasi']], ['Uang Saku', rpH_(r['Uang Saku'])]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : []);
+  return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
+    escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
 }
 function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
 
