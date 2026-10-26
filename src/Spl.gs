@@ -40,7 +40,7 @@ function simpanSPL(token, data) {
       if (!String(b.uraian || '').trim()) err.push('Uraian pekerjaan ' + sdr_(k.nama) + ' wajib diisi.');
       if (aktif.spl[id]) err.push(sdr_(k.nama) + ' sudah terdaftar di SPL ' + String(aktif.spl[id]).replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '') + '.');
       if (aktif.spd[id]) err.push(sdr_(k.nama) + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
-      const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
+      const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji, id: id }, P, L);
       h.error.forEach(e => err.push(sdr_(k.nama) + ' — ' + e));
       return { k: k, b: b, h: h };
     });

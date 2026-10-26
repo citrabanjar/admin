@@ -184,7 +184,8 @@ function statusHari_(tgl, libur) {
  *  - Istirahat dipotong 1 jam bila lembur mencakup penuh 18–19 (hari kerja) / 12–13 (hari libur)
  *  - Jam efektif = selisih jam - istirahat (min 0)
  *  - Kompensasi  = Basic Salary / 173 x (1,5 hari kerja | 2 hari libur) x jam efektif
- * @param {{tanggal, mulai, selesai, gaji}} x
+ *    Karyawan HL (Employee ID mengandung "HL"): faktor 1 (flat), hari kerja maupun hari libur
+ * @param {{tanggal, mulai, selesai, gaji, id}} x
  * @return {{hari, statusHari, istirahat, jamEfektif, kompensasi, error:string[], peringatan:string[]}}
  */
 function hitungLembur_(x, P, libur) {
@@ -213,7 +214,7 @@ function hitungLembur_(x, P, libur) {
   if (libur_ && s > jamKeAngka_(P.BATAS_SELESAI_LIBUR))
     out.peringatan.push('Hari libur selesai lewat ' + P.BATAS_SELESAI_LIBUR + ' — melebihi batas UU Ketenagakerjaan.');
 
-  const faktor = Number(libur_ ? P.FAKTOR_HARI_LIBUR : P.FAKTOR_HARI_KERJA);
+  const faktor = /HL/i.test(String(x.id || '')) ? 1 : Number(libur_ ? P.FAKTOR_HARI_LIBUR : P.FAKTOR_HARI_KERJA);
   out.kompensasi = x.gaji ? Math.round(x.gaji / Number(P.PEMBAGI_TARIF) * faktor * out.jamEfektif) : 0;
   return out;
 }
@@ -754,7 +755,7 @@ function simpanSPL(token, data) {
       if (!String(b.uraian || '').trim()) err.push('Uraian pekerjaan ' + sdr_(k.nama) + ' wajib diisi.');
       if (aktif.spl[id]) err.push(sdr_(k.nama) + ' sudah terdaftar di SPL ' + String(aktif.spl[id]).replace(/\s*\(\d{4}-\d{2}-\d{2}\)$/, '') + '.');
       if (aktif.spd[id]) err.push(sdr_(k.nama) + ' sedang dinas luar (' + aktif.spd[id] + ') — lembur tidak dapat diajukan.');
-      const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji }, P, L);
+      const h = hitungLembur_({ tanggal: tglStr, mulai: b.mulai, selesai: b.selesai, gaji: k.gaji, id: id }, P, L);
       h.error.forEach(e => err.push(sdr_(k.nama) + ' — ' + e));
       return { k: k, b: b, h: h };
     });
