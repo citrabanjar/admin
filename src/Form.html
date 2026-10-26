@@ -583,6 +583,8 @@ function hitungSPL() {
     if (id) {
       orang++;
       if (dipakai[id]) e.push('Karyawan ini sudah ada di baris ' + dipakai[id] + '.'); else dipakai[id] = i + 1;
+      const dn = tgl && (D.dinas || []).find(x => x.id === id && x.dari <= tgl && tgl <= x.sampai);
+      if (dn) e.push('Sedang dinas luar (' + dn.nomor + ', ' + tglPendek(dn.dari) + ' s/d ' + tglPendek(dn.sampai) + ') — tidak bisa diinput lembur.');
       if (!tgl) e.push('Isi Tanggal Lembur terlebih dahulu.');
       else if (m && s) { h = hitungLembur_({ tanggal: tgl, mulai: m, selesai: s, gaji: 0 }, D.P, liburForm()); e.push.apply(e, h.error); w.push.apply(w, h.peringatan); }
       else e.push('Pilih jam mulai & jam selesai.');

@@ -758,6 +758,7 @@ function dataForm(token) {
     user: infoUser_(u),
     karyawan: kar,
     libur: liburSet_(),
+    dinas: dinasPersonel_(),   // untuk menolak input lembur karyawan yang sedang dinas luar
     P: Object.fromEntries(pk.map(k => [k, P[k]])),
     jam: jam,
     pilihan: {
@@ -793,14 +794,25 @@ function suratAktif_(dari, sampai) {
     if (t && dari <= t && t <= sampai && STATUS_BATAL.indexOf(String(r['Status'])) < 0)
       out.spl[String(r['Employee ID']).toUpperCase()] = r['Nomor SPL'] + ' (' + t + ')';
   });
-  const spdAktif = {};
+  dinasPersonel_().forEach(x => { if (x.dari <= sampai && dari <= x.sampai) out.spd[x.id] = x.nomor; });
+  return out;
+}
+/** Rentang dinas tiap personel: tgl berangkat s/d berangkat + lama personel − 1 (maks. tgl kembali surat;
+ *  personel yang tidak ikut diperpanjang tetap sampai tanggal semula). Surat / personel batal diabaikan. */
+function dinasPersonel_() {
+  const induk = {};
   bacaTabel_(SH.SPD, 'Nomor SPD').forEach(r => {
     const b = r['Tgl Berangkat'], k = r['Tgl Kembali'];
-    if (b instanceof Date && k instanceof Date && STATUS_BATAL.indexOf(String(r['Status'])) < 0 &&
-        ymd_(b) <= sampai && dari <= ymd_(k)) spdAktif[r['Nomor SPD']] = true;
+    if (b instanceof Date && k instanceof Date && STATUS_BATAL.indexOf(String(r['Status'])) < 0) induk[r['Nomor SPD']] = { b: b, k: ymd_(k) };
   });
+  const out = [];
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    if (spdAktif[r['Nomor SPD']] && STATUS_BATAL.indexOf(String(r['Status'] || '')) < 0) out.spd[String(r['Employee ID']).toUpperCase()] = r['Nomor SPD'];
+    const I = induk[r['Nomor SPD']];
+    if (!I || STATUS_BATAL.indexOf(String(r['Status'] || '')) >= 0) return;
+    const lama = Number(r['Lama (hari)']) || 0;
+    let akhir = lama ? ymd_(new Date(I.b.getTime() + (lama - 1) * 864e5)) : I.k;
+    if (akhir > I.k) akhir = I.k;
+    out.push({ id: String(r['Employee ID']).toUpperCase(), nomor: r['Nomor SPD'], dari: ymd_(I.b), sampai: akhir });
   });
   return out;
 }
