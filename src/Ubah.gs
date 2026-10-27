@@ -521,13 +521,8 @@ function pengingatDinasHarian_() {
 
 /* ============================== REKAP HARIAN OWNER (setelah 17.00 WIB) ============================== */
 const OWNER_JAM = 17;
-/** Tandai tanggal lembur yang rekap owner-nya perlu dikirim / diperbarui pada jadwal berikutnya */
-function tandaiOwnerSpl_(tgl) {
-  if (!tgl) return;
-  const P = PropertiesService.getScriptProperties(), d = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
-  if (d.indexOf(tgl) < 0) { d.push(tgl); P.setProperty('OWNER_SPL_TGL', JSON.stringify(d)); }
-}
-/** Dipanggil prosesAntrian tiap menit; berjalan 1x sehari setelah pukul 17.00. */
+/** Dipanggil prosesAntrian tiap menit; berjalan 1x sehari setelah pukul 17.00 — rekap dinas untuk owner.
+ *  (Rekap lembur owner tetap dikirim langsung saat surat lembur di tanggal itu selesai.) */
 function rekapOwnerHarian_(paksa) {
   const P = PropertiesService.getScriptProperties(), now = new Date(), hari = ymd_(now);
   if (!paksa && (P.getProperty('OWNER_HARIAN') === hari || Number(Utilities.formatDate(now, TZ, 'H')) < OWNER_JAM)) return;
@@ -535,17 +530,6 @@ function rekapOwnerHarian_(paksa) {
   const sejak = Number(P.getProperty('OWNER_HARIAN_TS') || 0) || now.getTime() - 864e5;
   P.setProperty('OWNER_HARIAN_TS', String(now.getTime()));
   if (!owner_().length) return;
-  // 1. Surat Perintah Lembur: rekap owner per tanggal lembur yang ada perubahan
-  const tglSpl = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
-  P.setProperty('OWNER_SPL_TGL', '[]');
-  tglSpl.sort().forEach(t => {
-    try {
-      const r = bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t && STATUS_BATAL.indexOf(String(x['Status'])) < 0) ||
-        bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t);
-      if (r) rekapSPL_(r['Nomor SPL'], false, { jadwalOwner: 1, ['adm:' + String(r['Email Pembuat']).toLowerCase()]: 1, atasanLewat: 1 });
-    } catch (e) { logAksi_('SPL', t, 'REKAP OWNER GAGAL', '', String(e)); }
-  });
-  // 2. Surat Perintah Dinas: kejadian sejak rekap terakhir, per tim
   try { rekapDinasOwner_(sejak, now); } catch (e) { logAksi_('SPD', '-', 'REKAP OWNER GAGAL', '', String(e)); }
 }
 

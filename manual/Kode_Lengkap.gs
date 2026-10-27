@@ -1578,11 +1578,9 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap dikirim ke ' + em);
   }
 
-  // 2. rekap owner (semua admin) — owner = laporan terakhir: dikirim 1x sehari setelah pukul 17.00 (rekapOwnerHarian_).
-  //    Di luar jadwal itu tanggal ini hanya ditandai perlu dikirim / diperbarui.
+  // 2. rekap owner (semua admin) — setelah seluruh surat di tanggal itu selesai
   const own = owner_();
-  if (own.length && !sudah.jadwalOwner && !sudah.owner) { tandaiOwnerSpl_(tgl); sudah.owner = 1; }
-  if (own.length && sudah.jadwalOwner && !sudah.owner) {
+  if (own.length && !sudah.owner && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
     sudah.owner = 1;
     const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
     const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
@@ -1598,7 +1596,7 @@ function rekapSPL_(nomor, paksa, sudah) {
   const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
-  if (!sudah.atasanLewat) Object.values(daftarAtasan).forEach(a => {
+  Object.values(daftarAtasan).forEach(a => {
     const grp = hari.filter(r => rantai(r).some(x => x.id === a.id));
     if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
     sudah['ats:' + a.id] = 1;
@@ -2065,7 +2063,7 @@ function prosesAntrian() {
     const P = PropertiesService.getScriptProperties();
     P.setProperty(ANTRIAN_DETAK, String(Date.now()));
     try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
-    try { rekapOwnerHarian_(); } catch (e) { logAksi_('SPL', '-', 'REKAP OWNER GAGAL', '', String(e)); }        // 1x sehari setelah 17.00
+    try { rekapOwnerHarian_(); } catch (e) { logAksi_('SPD', '-', 'REKAP OWNER GAGAL', '', String(e)); }        // rekap dinas owner 1x sehari setelah 17.00
     while (Date.now() - mulai < 4 * 60 * 1000) {   // sisa antrian dilanjutkan pada menit berikutnya
       const t = ambilTugas_(P);
       if (!t) return;
@@ -3028,13 +3026,8 @@ function pengingatDinasHarian_() {
 
 /* ============================== REKAP HARIAN OWNER (setelah 17.00 WIB) ============================== */
 const OWNER_JAM = 17;
-/** Tandai tanggal lembur yang rekap owner-nya perlu dikirim / diperbarui pada jadwal berikutnya */
-function tandaiOwnerSpl_(tgl) {
-  if (!tgl) return;
-  const P = PropertiesService.getScriptProperties(), d = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
-  if (d.indexOf(tgl) < 0) { d.push(tgl); P.setProperty('OWNER_SPL_TGL', JSON.stringify(d)); }
-}
-/** Dipanggil prosesAntrian tiap menit; berjalan 1x sehari setelah pukul 17.00. */
+/** Dipanggil prosesAntrian tiap menit; berjalan 1x sehari setelah pukul 17.00 — rekap dinas untuk owner.
+ *  (Rekap lembur owner tetap dikirim langsung saat surat lembur di tanggal itu selesai.) */
 function rekapOwnerHarian_(paksa) {
   const P = PropertiesService.getScriptProperties(), now = new Date(), hari = ymd_(now);
   if (!paksa && (P.getProperty('OWNER_HARIAN') === hari || Number(Utilities.formatDate(now, TZ, 'H')) < OWNER_JAM)) return;
@@ -3042,17 +3035,6 @@ function rekapOwnerHarian_(paksa) {
   const sejak = Number(P.getProperty('OWNER_HARIAN_TS') || 0) || now.getTime() - 864e5;
   P.setProperty('OWNER_HARIAN_TS', String(now.getTime()));
   if (!owner_().length) return;
-  // 1. Surat Perintah Lembur: rekap owner per tanggal lembur yang ada perubahan
-  const tglSpl = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
-  P.setProperty('OWNER_SPL_TGL', '[]');
-  tglSpl.sort().forEach(t => {
-    try {
-      const r = bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t && STATUS_BATAL.indexOf(String(x['Status'])) < 0) ||
-        bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t);
-      if (r) rekapSPL_(r['Nomor SPL'], false, { jadwalOwner: 1, ['adm:' + String(r['Email Pembuat']).toLowerCase()]: 1, atasanLewat: 1 });
-    } catch (e) { logAksi_('SPL', t, 'REKAP OWNER GAGAL', '', String(e)); }
-  });
-  // 2. Surat Perintah Dinas: kejadian sejak rekap terakhir, per tim
   try { rekapDinasOwner_(sejak, now); } catch (e) { logAksi_('SPD', '-', 'REKAP OWNER GAGAL', '', String(e)); }
 }
 
