@@ -105,7 +105,7 @@ function kirimEmail_(ke, subjek, isiHtml, cc, lampiran) {
     const opt = { to: ke, subject: subjek,
       htmlBody: bungkusEmail_(isiHtml), inlineImages: { logo: logoBlob_() } };
     if (cc) opt.cc = cc;
-    if (lampiran) opt.attachments = [lampiran];
+    if (lampiran) opt.attachments = Array.isArray(lampiran) ? lampiran : [lampiran];
     MailApp.sendEmail(opt);
     return '';
   } catch (e) { return String(e.message || e); }
@@ -496,9 +496,11 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap dikirim ke ' + em);
   }
 
-  // 2. rekap owner (semua admin) — setelah seluruh surat di tanggal itu selesai
+  // 2. rekap owner (semua admin) — owner = laporan terakhir: dikirim 1x sehari setelah pukul 17.00 (rekapOwnerHarian_).
+  //    Di luar jadwal itu tanggal ini hanya ditandai perlu dikirim / diperbarui.
   const own = owner_();
-  if (own.length && !sudah.owner && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
+  if (own.length && !sudah.jadwalOwner && !sudah.owner) { tandaiOwnerSpl_(tgl); sudah.owner = 1; }
+  if (own.length && sudah.jadwalOwner && !sudah.owner) {
     sudah.owner = 1;
     const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
     const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
@@ -514,7 +516,7 @@ function rekapSPL_(nomor, paksa, sudah) {
   const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
-  Object.values(daftarAtasan).forEach(a => {
+  if (!sudah.atasanLewat) Object.values(daftarAtasan).forEach(a => {
     const grp = hari.filter(r => rantai(r).some(x => x.id === a.id));
     if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
     sudah['ats:' + a.id] = 1;

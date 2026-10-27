@@ -40,6 +40,7 @@ function prosesAntrian() {
     const P = PropertiesService.getScriptProperties();
     P.setProperty(ANTRIAN_DETAK, String(Date.now()));
     try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
+    try { rekapOwnerHarian_(); } catch (e) { logAksi_('SPL', '-', 'REKAP OWNER GAGAL', '', String(e)); }        // 1x sehari setelah 17.00
     while (Date.now() - mulai < 4 * 60 * 1000) {   // sisa antrian dilanjutkan pada menit berikutnya
       const t = ambilTugas_(P);
       if (!t) return;

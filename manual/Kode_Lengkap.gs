@@ -1187,7 +1187,7 @@ function kirimEmail_(ke, subjek, isiHtml, cc, lampiran) {
     const opt = { to: ke, subject: subjek,
       htmlBody: bungkusEmail_(isiHtml), inlineImages: { logo: logoBlob_() } };
     if (cc) opt.cc = cc;
-    if (lampiran) opt.attachments = [lampiran];
+    if (lampiran) opt.attachments = Array.isArray(lampiran) ? lampiran : [lampiran];
     MailApp.sendEmail(opt);
     return '';
   } catch (e) { return String(e.message || e); }
@@ -1578,9 +1578,11 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap dikirim ke ' + em);
   }
 
-  // 2. rekap owner (semua admin) — setelah seluruh surat di tanggal itu selesai
+  // 2. rekap owner (semua admin) — owner = laporan terakhir: dikirim 1x sehari setelah pukul 17.00 (rekapOwnerHarian_).
+  //    Di luar jadwal itu tanggal ini hanya ditandai perlu dikirim / diperbarui.
   const own = owner_();
-  if (own.length && !sudah.owner && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {
+  if (own.length && !sudah.jadwalOwner && !sudah.owner) { tandaiOwnerSpl_(tgl); sudah.owner = 1; }
+  if (own.length && sudah.jadwalOwner && !sudah.owner) {
     sudah.owner = 1;
     const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
     const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
@@ -1596,7 +1598,7 @@ function rekapSPL_(nomor, paksa, sudah) {
   const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
   S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => rantai(r).forEach(a => daftarAtasan[a.id] = a));
-  Object.values(daftarAtasan).forEach(a => {
+  if (!sudah.atasanLewat) Object.values(daftarAtasan).forEach(a => {
     const grp = hari.filter(r => rantai(r).some(x => x.id === a.id));
     if (sudah['ats:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan'])))) return;
     sudah['ats:' + a.id] = 1;
@@ -2063,6 +2065,7 @@ function prosesAntrian() {
     const P = PropertiesService.getScriptProperties();
     P.setProperty(ANTRIAN_DETAK, String(Date.now()));
     try { pengingatDinasHarian_(); } catch (e) { logAksi_('SPD', '-', 'PENGINGAT GAGAL', '', String(e)); }   // 1x sehari
+    try { rekapOwnerHarian_(); } catch (e) { logAksi_('SPL', '-', 'REKAP OWNER GAGAL', '', String(e)); }        // 1x sehari setelah 17.00
     while (Date.now() - mulai < 4 * 60 * 1000) {   // sisa antrian dilanjutkan pada menit berikutnya
       const t = ambilTugas_(P);
       if (!t) return;
@@ -2793,8 +2796,7 @@ function kirimRevisiSpd_(nomor, judul, ringkasHtml, idsTerkait, keOwner, emailPe
   const admin = String(param_().EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(emailPembuat || I['Email Pembuat']).toLowerCase();
   kirimEmail_(pembuat, judul + ' — ' + nomor + ' (' + tgl + ')', ringkasHtml + '<p>PDF Surat Perintah Dinas revisi terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>',
     admin && admin !== pembuat ? admin : '', pdf);
-  if (keOwner) owner_().forEach(o => kirimEmail_(o.email, 'Pemberitahuan: ' + judul + ' — ' + nomor,
-    '<p>Yth. <b>' + escH_(sdr_(o.nama)) + '</b>,</p><p>Sebagai pemberitahuan (mengetahui):</p>' + ringkasHtml + detail, '', pdf));
+  // owner tidak dikirimi langsung — dilaporkan di rekap harian owner setelah pukul 17.00 (rekapOwnerHarian_)
   logAksi_('SPD', nomor, 'PDF REVISI', ketua ? ketua.email : '', judul + ' — ' + file.getUrl());
   return { file: file, pdf: pdf, ketua: ketua };
 }
@@ -3022,6 +3024,105 @@ function pengingatDinasHarian_() {
       } catch (e) { logAksi_('SPD', r['Nomor SPD'], 'PENGINGAT GAGAL', '', String(e)); }
     });
   return n;
+}
+
+/* ============================== REKAP HARIAN OWNER (setelah 17.00 WIB) ============================== */
+const OWNER_JAM = 17;
+/** Tandai tanggal lembur yang rekap owner-nya perlu dikirim / diperbarui pada jadwal berikutnya */
+function tandaiOwnerSpl_(tgl) {
+  if (!tgl) return;
+  const P = PropertiesService.getScriptProperties(), d = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
+  if (d.indexOf(tgl) < 0) { d.push(tgl); P.setProperty('OWNER_SPL_TGL', JSON.stringify(d)); }
+}
+/** Dipanggil prosesAntrian tiap menit; berjalan 1x sehari setelah pukul 17.00. */
+function rekapOwnerHarian_(paksa) {
+  const P = PropertiesService.getScriptProperties(), now = new Date(), hari = ymd_(now);
+  if (!paksa && (P.getProperty('OWNER_HARIAN') === hari || Number(Utilities.formatDate(now, TZ, 'H')) < OWNER_JAM)) return;
+  P.setProperty('OWNER_HARIAN', hari);
+  const sejak = Number(P.getProperty('OWNER_HARIAN_TS') || 0) || now.getTime() - 864e5;
+  P.setProperty('OWNER_HARIAN_TS', String(now.getTime()));
+  if (!owner_().length) return;
+  // 1. Surat Perintah Lembur: rekap owner per tanggal lembur yang ada perubahan
+  const tglSpl = JSON.parse(P.getProperty('OWNER_SPL_TGL') || '[]');
+  P.setProperty('OWNER_SPL_TGL', '[]');
+  tglSpl.sort().forEach(t => {
+    try {
+      const r = bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t && STATUS_BATAL.indexOf(String(x['Status'])) < 0) ||
+        bacaBaris_('SPL').rows.find(x => x['Tanggal Lembur'] instanceof Date && ymd_(x['Tanggal Lembur']) === t);
+      if (r) rekapSPL_(r['Nomor SPL'], false, { jadwalOwner: 1, ['adm:' + String(r['Email Pembuat']).toLowerCase()]: 1, atasanLewat: 1 });
+    } catch (e) { logAksi_('SPL', t, 'REKAP OWNER GAGAL', '', String(e)); }
+  });
+  // 2. Surat Perintah Dinas: kejadian sejak rekap terakhir, per tim
+  try { rekapDinasOwner_(sejak, now); } catch (e) { logAksi_('SPD', '-', 'REKAP OWNER GAGAL', '', String(e)); }
+}
+
+function rekapDinasOwner_(sejak, now) {
+  const baru = v => v instanceof Date && v.getTime() > sejak && v.getTime() <= now.getTime();
+  const ev = {};   // nomor → daftar kejadian
+  const tambah = (n, x) => (ev[n] = ev[n] || []).push(x);
+  // disetujui berangkat (PDF surat pertama dikirim) — dari Log
+  sheet_(SH.LOG).getDataRange().getValues().slice(1).forEach(r => {   // kolom Log: waktu, jenis, nomor, aksi, oleh, keterangan
+    if (r[1] === 'SPD' && r[3] === 'PDF DIKIRIM' && baru(r[0])) tambah(r[2], { t: 'setuju' });
+  });
+  bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
+    if (baru(r['Lapor Pulang Pada'])) tambah(r['Nomor SPD'], { t: 'pulang', nama: r['Full Name'], tgl: r['Tgl Pulang Aktual'], lama: r['Lama Aktual'] });
+  });
+  if (cariSheet_(ss_(), SH_UBAH.UBAH)) bacaTabel_(SH_UBAH.UBAH, 'ID').forEach(r => {
+    if (r['Jenis'] === 'TAMBAH KAS' && baru(r['Dibuat Pada'])) tambah(r['Nomor SPD'], { t: 'kas', nominal: r['Tambah Kas'], alasan: r['Alasan'] });
+    if (r['Jenis'] === 'SERAH KAS' && baru(r['Dibuat Pada'])) tambah(r['Nomor SPD'], { t: 'serah', nominal: r['Tambah Kas'], alasan: r['Alasan'] });
+  });
+  if (cariSheet_(ss_(), SH_UBAH.PP)) {
+    const pp = {};
+    bacaTabel_(SH_UBAH.PP, 'ID Perubahan').forEach(r => { if (r['Status'] === UBAH_ST.SETUJU && baru(r['Disetujui Pada'])) (pp[r['ID Perubahan']] = pp[r['ID Perubahan']] || { n: r['Nomor SPD'], nama: [] }).nama.push(r['Full Name']); });
+    const U = cariSheet_(ss_(), SH_UBAH.UBAH) ? bacaTabel_(SH_UBAH.UBAH, 'ID') : [];
+    Object.keys(pp).forEach(id => { const u = U.find(x => String(x['ID']) === id) || {}; tambah(pp[id].n, { t: 'panjang', nama: pp[id].nama, sampai: u['Tgl Kembali Baru'], alasan: u['Alasan'] }); });
+  }
+  bacaTabel_(SH.SPD, 'Nomor SPD').forEach(r => {
+    if (baru(r['Tgl Laporan'])) tambah(r['Nomor SPD'], { t: 'selesai' });
+    if (baru(r['Potongan Dicatat Pada'])) tambah(r['Nomor SPD'], { t: 'potong', nominal: r['Potongan Gaji Ketua'], ket: r['Keterangan Potongan'] });
+  });
+  const nomor = Object.keys(ev).filter(Boolean).sort();
+  if (!nomor.length) return;
+  const th = 'padding:6px 8px;background:#F4F5F7;border:1px solid #E2E4E8;text-align:left;font-size:12px', td = 'padding:6px 8px;border:1px solid #E2E4E8;vertical-align:top;font-size:12px';
+  const lampiran = [], ptj = cariSheet_(ss_(), 'Ptj SPD') ? bacaTabel_('Ptj SPD', 'Nomor SPD') : [];
+  const blok = nomor.map((n, i) => {
+    const S = dataSpd_(n); if (!S) return '';
+    const I = induk_('SPD', n), k = ev[n], ada = t => k.filter(x => x.t === t);
+    const ok = S.personel.filter(p => p.status === ST.SETUJU), tolak = S.personel.filter(p => [ST.TOLAK, ST.TIDAK].indexOf(p.status) >= 0);
+    const baris = [];
+    if (ada('setuju').length) {
+      baris.push(['Disetujui berangkat', ok.length + ' karyawan: ' + ok.map(p => sdr_(p.nama)).join(', ') + (tolak.length ? '<br><span style="color:#B42318">Tidak berangkat: ' + tolak.map(p => sdr_(p.nama) + ' (' + p.status.toLowerCase() + ')').join(', ') + '</span>' : '')]);
+      try { const m = String(I['Link PDF'] || '').match(/\/d\/([\w-]{20,})/); if (m) lampiran.push(DriveApp.getFileById(m[1]).getBlob()); } catch (e) {}
+    }
+    ada('panjang').forEach(x => baris.push(['Perpanjangan', 's/d ' + tglIndo_(x.sampai) + ' — ' + x.nama.map(sdr_).join(', ') + (x.alasan ? '<br><i>' + escH_(x.alasan) + '</i>' : '')]));
+    ada('kas').forEach(x => baris.push(['Tambahan uang kas', rpH_(x.nominal) + (x.alasan ? ' — ' + escH_(x.alasan) : '')]));
+    ada('pulang').forEach(x => baris.push(['Pulang lebih dulu', sdr_(x.nama) + ' — ' + tglIndo_(x.tgl) + ' (' + x.lama + ' hari), uang saku dibayar kasir']));
+    ada('serah').forEach(x => baris.push(['Serah terima kas', rpH_(x.nominal) + ' — ' + escH_(x.alasan)]));
+    if (ada('selesai').length) {
+      const p = ptj.filter(x => x['Nomor SPD'] === n).pop() || {};
+      const kembali = Number(p['Uang Kas Dikembalikan']) || 0;
+      baris.push(['Dinas selesai', 'Kembali ' + tglIndo_(p['Tgl Kembali Aktual']) + ' (' + p['Lama Aktual (hari)'] + ' hari) — ' + escH_(p['Ringkasan Kegiatan'] || '')]);
+      try { const m = String(I['Link PDF Laporan'] || '').match(/\/d\/([\w-]{20,})/); if (m) lampiran.push(DriveApp.getFileById(m[1]).getBlob()); } catch (e) {}
+      k.kas = { biaya: Number(p['Biaya Lain Realisasi']) || 0, saku: String(p['Pembayaran Uang Saku'] || ''), sisa: kembali };
+    }
+    ada('potong').forEach(x => baris.push(['Potongan gaji ketua tim', rpH_(x.nominal) + (x.ket ? ' — ' + escH_(x.ket) : '') + ' → surat SELESAI']));
+    // rekap uang kas tim
+    const kas = [['Uang kas awal', rpH_(S.kasAwal)]].concat(S.tambahKas.map(t => ['Tambahan kas', rpH_(t.nominal)]), [['<b>Total uang kas</b>', '<b>' + rpH_(S.uangKas) + '</b>']],
+      k.kas ? [['Biaya lainnya (realisasi)', '( ' + rpH_(k.kas.biaya) + ' )'], ['Uang saku', escH_(k.kas.saku)],
+        [k.kas.sisa >= 0 ? '<b>Uang kas dikembalikan</b>' : '<b style="color:#B42318">Kekurangan kas (potong gaji ketua tim)</b>', '<b>' + rpH_(Math.abs(k.kas.sisa)) + '</b>']] : []);
+    return '<h3 style="margin:18px 0 6px;font-size:14px;color:#BE353F">Tim ' + (i + 1) + ' — ' + escH_(n) + '</h3>' +
+      '<div style="font-size:12px;color:#555;margin-bottom:6px">' + escH_(S.tempat) + ' · ' + tglIndo_(keTanggal_(S.berangkat)) + ' s/d ' + tglIndo_(keTanggal_(S.kembali)) +
+        (S.ketua ? ' · ketua tim ' + escH_(sdr_(S.ketua.nama)) : '') + '</div>' +
+      '<table style="border-collapse:collapse;width:100%">' + baris.map(b => '<tr><td style="' + th + ';width:150px">' + b[0] + '</td><td style="' + td + '">' + b[1] + '</td></tr>').join('') + '</table>' +
+      '<table style="border-collapse:collapse;width:100%;margin-top:6px">' + kas.map(b => '<tr><td style="' + td + '">' + b[0] + '</td><td style="' + td + ';text-align:right;white-space:nowrap;width:140px">' + b[1] + '</td></tr>').join('') + '</table>';
+  }).join('');
+  const tgl = hariIndo_(now) + ', ' + tglIndo_(now);
+  owner_().forEach(o => {
+    const err = kirimEmail_(o.email, 'Rekap Harian Dinas — ' + tglIndo_(now),
+      '<p>Yth. <b>' + escH_(sdr_(o.nama)) + '</b>,</p><p>Terlampir kami sampaikan rekap perjalanan dinas hari ' + escH_(tgl) + ' (' + nomor.length + ' tim):</p>' + blok +
+      (lampiran.length ? '<p style="margin-top:14px">PDF surat / laporan terkait terlampir.</p>' : ''), '', lampiran.length ? lampiran : null);
+    logAksi_('SPD', nomor.join(', '), err ? 'REKAP OWNER GAGAL' : 'REKAP OWNER HARIAN', o.email, err || nomor.length + ' tim');
+  });
 }
 /**
  * SISTEM SPL & SPD — File : Logo.gs
