@@ -42,10 +42,7 @@ function apiData_(q) {
   } catch (e) { return keluar({ ok: false, error: String(e.message || e) }); }
 }
 
-/** Menu: tampilkan kunci & contoh URL */
+/** Menu: tampilkan kunci API diagnosa */
 function menuKunciApi() {
-  const url = ScriptApp.getService().getUrl();
-  SpreadsheetApp.getUi().alert('Kunci API pengecekan KantorKu:\n\n' + kunciApi_() +
-    '\n\nContoh URL (data SPL hari ini):\n' + url + '?api=spl&key=' + kunciApi_() +
-    '\n\nKunci ini hanya membuka data SPL (tanpa gaji). Jangan dibagikan ke orang lain.');
+  SpreadsheetApp.getUi().alert('Kunci API diagnosa:\n\n' + kunciApi_() + '\n\nKunci ini hanya membuka data diagnosa (tanpa gaji). Jangan dibagikan ke orang lain.');
 }
