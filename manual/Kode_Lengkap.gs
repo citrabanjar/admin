@@ -351,10 +351,8 @@ function onOpen() {
     .addItem('✉ Kirim ulang email konfirmasi / persetujuan', 'menuKirimUlangKonfirmasi')
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
-    .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')
-    .addItem('🧪 Tes pengiriman email (diagnosa bounce)', 'menuTesEmail')
-    .addItem('🧪 Tes email isi asli (diagnosa bounce 2)', 'menuTesEmail2')
-    .addItem('🧪 Tes email per bagian isi (diagnosa bounce 3)', 'menuTesEmail3')
+    .addItem('🔑 Kunci API diagnosa', 'menuKunciApi')
+    .addItem('🧹 Hapus sheet tidak terpakai', 'hapusSheetTakTerpakai')
     .addToUi();
 }
 
@@ -545,84 +543,19 @@ function lihatNomorBerikutnya() {
     '\nSPD : ' + nomorBerikutnya_('SPD', hari));
 }
 
-/**
- * Diagnosa penolakan Gmail: kirim 5 variasi email ke 1 alamat (jeda 20 detik),
- * lalu lihat di Email Log Search variasi mana yang Bounced.
- */
-function menuTesEmail() {
-  const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('Tes pengiriman email', 'Alamat email tujuan tes (mis. budimul3006@gmail.com).\nAkan dikirim 5 email berbeda, jeda 20 detik (± 1,5 menit).', ui.ButtonSet.OK_CANCEL);
-  if (r.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r.getResponseText().trim();
-  if (!/^\S+@\S+\.\S+$/.test(ke)) return ui.alert('Alamat email tidak valid.');
-  const url = urlWeb_(), tombol = tombol_(url + '?a=dk&id=TES123&s=TES', '✅ Bersedia', '#1E7B4A') + tombol_(url + '?a=dk&id=TES123&s=TES&p=tidak', '❌ Tidak Bersedia', '#B42318');
-  const v = [
-    ['TES 1 — teks polos', { body: 'Tes 1: email teks polos tanpa logo dan tanpa link.' }],
-    ['TES 2 — HTML + logo', { htmlBody: bungkusEmail_('<p>Tes 2: HTML dengan logo, tanpa link.</p>'), inlineImages: { logo: logoBlob_() } }],
-    ['TES 3 — link alamat form', { htmlBody: '<p>Tes 3: HTML tanpa logo, dengan link biasa ke <a href="' + url + '">' + url + '</a>.</p>' }],
-    ['TES 4 — tombol link aksi', { htmlBody: '<p>Tes 4: HTML tanpa logo, dengan tombol link aksi:</p><p>' + tombol + '</p>' }],
-    ['TES 5 — lengkap (logo + tombol)', { htmlBody: bungkusEmail_('<p>Tes 5: seperti email konfirmasi asli (logo + tombol):</p><p>' + tombol + '</p>'), inlineImages: { logo: logoBlob_() } }]
-  ];
-  const hasil = v.map((x, i) => {
-    if (i) Utilities.sleep(20000);
-    try { MailApp.sendEmail(Object.assign({ to: ke, subject: x[0] + ' (' + Utilities.formatDate(new Date(), TZ, 'HH:mm:ss') + ')', body: x[1].body || 'Tes' }, x[1])); return x[0] + ': terkirim'; }
-    catch (e) { return x[0] + ': GAGAL ' + e.message; }
-  });
-  logAksi_('SPL', '-', 'TES EMAIL', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Admin Console → Email Log Search untuk alamat ' + ke + ' (± 5 menit): mana yang Delivered dan mana yang Bounced.\nLink alamat yang dipakai: ' + url);
-}
-
-/** Diagnosa 2: kirim isi email konfirmasi ASLI dari 1 surat dinas.
- *  A = 1 email sendiri; jeda 30 detik; B & C = 2 email isi sama dikirim beruntun (seperti ke 2 personel sekaligus). */
-function menuTesEmail2() {
-  const ui = SpreadsheetApp.getUi();
-  const r1 = ui.prompt('Tes email isi asli', 'Alamat email tujuan tes:', ui.ButtonSet.OK_CANCEL);
-  if (r1.getSelectedButton() !== ui.Button.OK) return;
-  const r2 = ui.prompt('Tes email isi asli', 'Nomor Surat Perintah Dinas yang dipakai isinya (mis. 002 / SPD / CBA / X / 2026):', ui.ButtonSet.OK_CANCEL);
-  if (r2.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r1.getResponseText().trim(), nomor = r2.getResponseText().trim();
-  const S = bacaBaris_('SPD'), r = S.rows.find(x => x['Nomor SPD'] === nomor);
-  if (!r) return ui.alert('Nomor surat tidak ditemukan.');
-  const I = induk_('SPD', nomor, r), J = JENIS.SPD, id = String(r['ID Baris']);
-  const isi = '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>' +
-    tabelDetail_('SPD', r, I, true) + '<p style="margin-top:18px">' + tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
-  const subj = 'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_('SPD', r, I);
-  const hasil = [];
-  hasil.push('A (sendiri): ' + (kirimEmail_(ke, '[TES A] ' + subj, isi) || 'terkirim'));
-  Utilities.sleep(30000);
-  hasil.push('B (beruntun): ' + (kirimEmail_(ke, '[TES B] ' + subj, isi) || 'terkirim'));
-  hasil.push('C (beruntun): ' + (kirimEmail_(ke, '[TES C] ' + subj, isi) || 'terkirim'));
-  logAksi_('SPD', nomor, 'TES EMAIL 2', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Email Log Search untuk ' + ke + ': status TES A, TES B, TES C.\n(Tombol di email tes ini adalah link asli — jangan diklik.)');
-}
-
-/** Diagnosa 3: isi email konfirmasi dipecah per bagian (jeda 30 detik) untuk mencari bagian yang ditolak Gmail. */
-function menuTesEmail3() {
-  const ui = SpreadsheetApp.getUi();
-  const r1 = ui.prompt('Tes email per bagian', 'Alamat email tujuan tes:', ui.ButtonSet.OK_CANCEL);
-  if (r1.getSelectedButton() !== ui.Button.OK) return;
-  const r2 = ui.prompt('Tes email per bagian', 'Nomor Surat Perintah Dinas yang dipakai isinya:', ui.ButtonSet.OK_CANCEL);
-  if (r2.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r1.getResponseText().trim(), nomor = r2.getResponseText().trim();
-  const r = bacaBaris_('SPD').rows.find(x => x['Nomor SPD'] === nomor);
-  if (!r) return ui.alert('Nomor surat tidak ditemukan.');
-  const I = induk_('SPD', nomor, r), id = String(r['ID Baris']);
-  const tabel = rows => '<table style="border-collapse:collapse;width:100%;font-size:13px">' + rows.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
-    escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
-  const umum = [['Nomor SPD', nomor], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
-    ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'], ['Transportasi', I['Transportasi']]];
-  const uang = [['Uang Saku', rpH_(r['Uang Saku'])], ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']];
-  const tombol = '<p style="margin-top:18px">' + tombol_(linkAksi_('dk', id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_('dk', id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
-  const v = [
-    ['TES D — tanpa nominal uang + tombol', tabel(umum) + tombol],
-    ['TES E — tabel lengkap tanpa tombol', tabel(umum.concat(uang))],
-    ['TES F — hanya nominal uang + tombol', tabel(uang) + tombol],
-    ['TES G — tabel lengkap + tombol, judul netral', tabel(umum.concat(uang)) + tombol]
-  ];
-  const hasil = v.map((x, i) => { if (i) Utilities.sleep(30000);
-    return x[0] + ': ' + (kirimEmail_(ke, x[0] === v[3][0] ? '[TES G] Surat Perintah ' + nomor : '[' + x[0].slice(0, 5) + '] Konfirmasi Dinas Luar ' + I['Tempat Tujuan'], '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p>' + x[1]) || 'terkirim'); });
-  logAksi_('SPD', nomor, 'TES EMAIL 3', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Email Log Search: status TES D, E, F, G. (Jangan klik tombol di email tes.)');
+/** Hapus sheet sisa fitur pengecekan KantorKu terjadwal (tidak dipakai lagi); sheet lain yang tidak dikenal hanya dilaporkan. */
+function hapusSheetTakTerpakai() {
+  const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hapus = ['Cek KantorKu', 'Verifikasi Lembur'];
+  const dipakai = [SH.KARYAWAN, 'Data Karyawan', 'Master Karyawan', SH.PARAM, SH.PILIHAN, SH.LIBUR, SH.SPL, SH.SPD, SH.PERSONEL, SH.BIAYA, SH.LOG,
+    'Ptj SPD', 'Ptj Personel SPD', 'Ptj Biaya SPD', 'Perubahan SPD', 'Perpanjangan Personel'];
+  const ada = ss.getSheets().map(s => s.getName());
+  const target = ada.filter(n => hapus.indexOf(n) >= 0), lain = ada.filter(n => hapus.indexOf(n) < 0 && dipakai.indexOf(n) < 0);
+  if (!target.length) return ui.alert('Tidak ada sheet sisa pengecekan KantorKu.' + (lain.length ? '\n\nSheet lain di luar sistem (tidak dihapus): ' + lain.join(', ') : ''));
+  if (ui.alert('Hapus sheet tidak terpakai', 'Sheet berikut akan DIHAPUS permanen:\n• ' + target.join('\n• ') + '\n\nLanjutkan?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  target.forEach(n => ss.deleteSheet(ss.getSheetByName(n)));
+  logAksi_('SPL', '-', 'HAPUS SHEET', '', target.join(', '));
+  ui.alert('Dihapus: ' + target.join(', ') + (lain.length ? '\n\nSheet lain di luar sistem (tidak dihapus, cek manual): ' + lain.join(', ') : ''));
 }
 /**
  * =====================================================================
@@ -2133,11 +2066,9 @@ function jalankanTugas_(t) {
 /**
  * =====================================================================
  *  SISTEM SPL & SPD — File : Api.gs
- *  "Pintu data" HANYA-BACA untuk pengecekan pengajuan lembur di KantorKu.
- *  api=spl (SPL disetujui & belum dieksekusi) · api=laporan (simpan hasil cocok) · api=setuju (baris dicentang)
- *  api=tandai (tandai sudah dieksekusi) — semua butuh &key=<KUNCI>
+ *  "Pintu data" HANYA-BACA untuk diagnosa (api=diag, antrian, struktur, peran) — butuh &key=<KUNCI>.
  *  - Tanpa data gaji / estimasi kompensasi.
- *  - Kunci dilihat lewat menu ⚙️ SPL / SPD → 🔑 Kunci API pengecekan KantorKu.
+ *  - Kunci dilihat lewat menu ⚙️ SPL / SPD → 🔑 Kunci API diagnosa.
  * =====================================================================
  */
 
@@ -2148,33 +2079,10 @@ function kunciApi_() {
   return k;
 }
 
-const SH_CEK = 'Cek KantorKu';
-const KOLOM_CEK = ['Dicek Pada', 'ID Baris', 'Nomor SPL', 'Tanggal Lembur', 'Employee ID', 'Full Name', 'Jam SPL', 'Jam Efektif SPL',
-  'Jam KantorKu', 'Durasi KantorKu', 'Check Out', 'Catatan', 'Setuju', 'Status Eksekusi', 'Dieksekusi Pada'];
-
-/** Sheet laporan pencocokan (dibuat otomatis) */
-function sheetCek_() {
-  const ss = ss_();
-  let sh = ss.getSheetByName(SH_CEK);
-  if (!sh) {
-    sh = ss.insertSheet(SH_CEK);
-    sh.getRange(1, 1, 1, KOLOM_CEK.length).setValues([KOLOM_CEK]).setFontWeight('bold').setBackground('#3A3A3A').setFontColor('#FFFFFF');
-    sh.setFrozenRows(1);
-    sh.getRange('M2:M').insertCheckboxes();
-    sh.getRange('M1').setNote('Centang baris yang disetujui, lalu ketik "eksekusi" ke Claude.');
-    sh.setColumnWidth(6, 200); sh.setColumnWidth(12, 260);
-  }
-  return sh;
-}
-
 function apiData_(q) {
   const keluar = o => ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON);
   if (!q.key || q.key !== kunciApi_()) return keluar({ ok: false, error: 'kunci salah' });
   try {
-    if (q.api === 'spl') return keluar(apiSpl_(q));
-    if (q.api === 'laporan') return keluar(apiLaporan_(q));
-    if (q.api === 'setuju') return keluar(apiSetuju_());
-    if (q.api === 'tandai') return keluar(apiTandai_(q));
     if (q.api === 'diag') {   // diagnosa: log terakhir + baris lembur terbaru (tanpa gaji)
       const t = v => v instanceof Date ? Utilities.formatDate(v, TZ, 'dd/MM HH:mm:ss') : v;
       const log = sheet_(SH.LOG).getDataRange().getValues().slice(-40).map(r => r.map(t).join(' | '));
@@ -2197,83 +2105,6 @@ function apiData_(q) {
       .map(k => ({ id: k.id, nama: k.nama, peran: k.peran, atasan: k.atasan, akses: k.akses, adaEmail: !!k.email, aktif: k.aktif })) });   // cek ADMIN/BOSS (tanpa gaji & email)
     return keluar({ ok: false, error: 'api tidak dikenal' });
   } catch (e) { return keluar({ ok: false, error: String(e.message || e) }); }
-}
-
-/** SPL yang DISETUJUI atasan & BELUM dieksekusi di KantorKu (default 30 hari terakhir). */
-function apiSpl_(q) {
-  const tglOk = s => /^\d{4}-\d{2}-\d{2}$/.test(String(s || ''));
-  const kini = new Date(), hariIni = ymd_(kini);
-  const dari = tglOk(q.dari) ? q.dari : ymd_(new Date(kini.getTime() - 30 * 864e5)), sampai = tglOk(q.sampai) ? q.sampai : hariIni;
-  const spl = bacaTabel_(SH.SPL, 'Nomor SPL').filter(r => {
-    const t = r['Tanggal Lembur'] instanceof Date ? ymd_(r['Tanggal Lembur']) : '';
-    return t && dari <= t && t <= sampai && r['Status'] === 'DISETUJUI' && !String(r['KantorKu'] || '').trim();
-  }).map(r => ({
-    idBaris: String(r['ID Baris']), nomor: r['Nomor SPL'], tanggal: ymd_(r['Tanggal Lembur']), statusHari: r['Status Hari'],
-    id: String(r['Employee ID']).toUpperCase(), nama: r['Full Name'],
-    mulai: String(r['Jam Mulai']), selesai: String(r['Jam Selesai']), istirahat: r['Istirahat'], jamEfektif: Number(r['Jam Efektif']) || 0
-  }));
-  return { ok: true, dari: dari, sampai: sampai, spl: spl };
-}
-
-/** Simpan hasil cocok ke sheet "Cek KantorKu". q.data = JSON array
- *  [{idBaris, jamKantorku, durasiKantorku, checkOut, catatan}] (data SPL dilengkapi otomatis). */
-function apiLaporan_(q) {
-  const data = JSON.parse(q.data || '[]');
-  const spl = {}; bacaTabel_(SH.SPL, 'Nomor SPL').forEach(r => spl[String(r['ID Baris'])] = r);
-  const sh = sheetCek_(), n = sh.getLastRow() - 1;
-  const ada = {};
-  (n > 0 ? sh.getRange(2, 2, n, 1).getValues() : []).forEach((r, i) => ada[String(r[0])] = i + 2);
-  let baru = 0, ubah = 0;
-  data.forEach(d => {
-    const r = spl[String(d.idBaris)]; if (!r) return;
-    const baris = [new Date(), String(d.idBaris), r['Nomor SPL'], r['Tanggal Lembur'], r['Employee ID'], r['Full Name'],
-      r['Jam Mulai'] + ' - ' + r['Jam Selesai'], Number(r['Jam Efektif']) || 0,
-      d.jamKantorku || '', d.durasiKantorku || '', d.checkOut || '', d.catatan || ''];
-    const row = ada[String(d.idBaris)];
-    if (row) {
-      if (String(sh.getRange(row, 14).getValue()).trim()) return;   // sudah dieksekusi → jangan diubah
-      sh.getRange(row, 1, 1, 12).setValues([baris]); ubah++;
-    } else {
-      const r0 = sh.getLastRow() + 1;
-      sh.getRange(r0, 1, 1, 12).setValues([baris]);
-      sh.getRange(r0, 13).insertCheckboxes(); baru++;
-    }
-  });
-  logAksi_('SPL', '-', 'CEK KANTORKU', 'Claude', baru + ' baris baru, ' + ubah + ' diperbarui');
-  return { ok: true, baru: baru, diperbarui: ubah };
-}
-
-/** Baris yang sudah dicentang "Setuju" dan belum dieksekusi */
-function apiSetuju_() {
-  const sh = sheetCek_(), n = sh.getLastRow() - 1;
-  if (n < 1) return { ok: true, baris: [] };
-  const v = sh.getRange(2, 1, n, KOLOM_CEK.length).getValues();
-  const st = {}; bacaTabel_(SH.SPL, 'Nomor SPL').forEach(r => st[String(r['ID Baris'])] = r['Status']);
-  // lembur yang sudah dibatalkan / tidak lagi DISETUJUI tidak boleh di-approve di KantorKu
-  v.forEach((r, i) => { if (r[12] === true && !String(r[13]).trim() && st[String(r[1])] && st[String(r[1])] !== ST.SETUJU) {
-    sh.getRange(i + 2, 14).setValue('TIDAK DIEKSEKUSI: lembur ' + st[String(r[1])]); r[13] = 'x'; } });
-  return { ok: true, baris: v.filter(r => r[12] === true && !String(r[13]).trim()).map(r => ({
-    idBaris: String(r[1]), nomor: r[2], tanggal: r[3] instanceof Date ? ymd_(r[3]) : String(r[3]),
-    id: String(r[4]).toUpperCase(), nama: r[5], jamSpl: r[6], jamEfektif: r[7], jamKantorku: r[8], durasiKantorku: r[9]
-  })) };
-}
-
-/** Tandai sudah dieksekusi. q.ids = "idBaris1,idBaris2", q.status = APPROVED | GAGAL: alasan */
-function apiTandai_(q) {
-  const ids = String(q.ids || '').split(',').map(s => s.trim()).filter(Boolean);
-  const status = String(q.status || 'APPROVED').slice(0, 200), now = new Date();
-  const label = status + ' ' + Utilities.formatDate(now, TZ, 'dd/MM/yyyy HH:mm');
-  const sh = sheetCek_(), n = sh.getLastRow() - 1;
-  (n > 0 ? sh.getRange(2, 2, n, 1).getValues() : []).forEach((r, i) => {
-    if (ids.indexOf(String(r[0])) >= 0) sh.getRange(i + 2, 14, 1, 2).setValues([[status, now]]);
-  });
-  if (status === 'APPROVED') {
-    pastikanKolom_(SH.SPL, KOLOM_SPL_TAMBAHAN);
-    const S = bacaBaris_('SPL');
-    S.rows.filter(r => ids.indexOf(String(r['ID Baris'])) >= 0).forEach(r => ubahBaris_(S, r._row, { 'KantorKu': label }));
-  }
-  logAksi_('SPL', '-', 'EKSEKUSI KANTORKU', 'Claude', status + ': ' + ids.join(', '));
-  return { ok: true, ditandai: ids.length };
 }
 
 /** Menu: tampilkan kunci & contoh URL */

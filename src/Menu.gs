@@ -24,10 +24,8 @@ function onOpen() {
     .addItem('✉ Kirim ulang email konfirmasi / persetujuan', 'menuKirimUlangKonfirmasi')
     .addItem('📄 Buat & kirim PDF (SPL/SPD) sekarang', 'menuPdfSPL')
     .addItem('Lihat nomor surat berikutnya', 'lihatNomorBerikutnya')
-    .addItem('🔑 Kunci API pengecekan KantorKu', 'menuKunciApi')
-    .addItem('🧪 Tes pengiriman email (diagnosa bounce)', 'menuTesEmail')
-    .addItem('🧪 Tes email isi asli (diagnosa bounce 2)', 'menuTesEmail2')
-    .addItem('🧪 Tes email per bagian isi (diagnosa bounce 3)', 'menuTesEmail3')
+    .addItem('🔑 Kunci API diagnosa', 'menuKunciApi')
+    .addItem('🧹 Hapus sheet tidak terpakai', 'hapusSheetTakTerpakai')
     .addToUi();
 }
 
@@ -218,82 +216,17 @@ function lihatNomorBerikutnya() {
     '\nSPD : ' + nomorBerikutnya_('SPD', hari));
 }
 
-/**
- * Diagnosa penolakan Gmail: kirim 5 variasi email ke 1 alamat (jeda 20 detik),
- * lalu lihat di Email Log Search variasi mana yang Bounced.
- */
-function menuTesEmail() {
-  const ui = SpreadsheetApp.getUi();
-  const r = ui.prompt('Tes pengiriman email', 'Alamat email tujuan tes (mis. budimul3006@gmail.com).\nAkan dikirim 5 email berbeda, jeda 20 detik (± 1,5 menit).', ui.ButtonSet.OK_CANCEL);
-  if (r.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r.getResponseText().trim();
-  if (!/^\S+@\S+\.\S+$/.test(ke)) return ui.alert('Alamat email tidak valid.');
-  const url = urlWeb_(), tombol = tombol_(url + '?a=dk&id=TES123&s=TES', '✅ Bersedia', '#1E7B4A') + tombol_(url + '?a=dk&id=TES123&s=TES&p=tidak', '❌ Tidak Bersedia', '#B42318');
-  const v = [
-    ['TES 1 — teks polos', { body: 'Tes 1: email teks polos tanpa logo dan tanpa link.' }],
-    ['TES 2 — HTML + logo', { htmlBody: bungkusEmail_('<p>Tes 2: HTML dengan logo, tanpa link.</p>'), inlineImages: { logo: logoBlob_() } }],
-    ['TES 3 — link alamat form', { htmlBody: '<p>Tes 3: HTML tanpa logo, dengan link biasa ke <a href="' + url + '">' + url + '</a>.</p>' }],
-    ['TES 4 — tombol link aksi', { htmlBody: '<p>Tes 4: HTML tanpa logo, dengan tombol link aksi:</p><p>' + tombol + '</p>' }],
-    ['TES 5 — lengkap (logo + tombol)', { htmlBody: bungkusEmail_('<p>Tes 5: seperti email konfirmasi asli (logo + tombol):</p><p>' + tombol + '</p>'), inlineImages: { logo: logoBlob_() } }]
-  ];
-  const hasil = v.map((x, i) => {
-    if (i) Utilities.sleep(20000);
-    try { MailApp.sendEmail(Object.assign({ to: ke, subject: x[0] + ' (' + Utilities.formatDate(new Date(), TZ, 'HH:mm:ss') + ')', body: x[1].body || 'Tes' }, x[1])); return x[0] + ': terkirim'; }
-    catch (e) { return x[0] + ': GAGAL ' + e.message; }
-  });
-  logAksi_('SPL', '-', 'TES EMAIL', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Admin Console → Email Log Search untuk alamat ' + ke + ' (± 5 menit): mana yang Delivered dan mana yang Bounced.\nLink alamat yang dipakai: ' + url);
-}
-
-/** Diagnosa 2: kirim isi email konfirmasi ASLI dari 1 surat dinas.
- *  A = 1 email sendiri; jeda 30 detik; B & C = 2 email isi sama dikirim beruntun (seperti ke 2 personel sekaligus). */
-function menuTesEmail2() {
-  const ui = SpreadsheetApp.getUi();
-  const r1 = ui.prompt('Tes email isi asli', 'Alamat email tujuan tes:', ui.ButtonSet.OK_CANCEL);
-  if (r1.getSelectedButton() !== ui.Button.OK) return;
-  const r2 = ui.prompt('Tes email isi asli', 'Nomor Surat Perintah Dinas yang dipakai isinya (mis. 002 / SPD / CBA / X / 2026):', ui.ButtonSet.OK_CANCEL);
-  if (r2.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r1.getResponseText().trim(), nomor = r2.getResponseText().trim();
-  const S = bacaBaris_('SPD'), r = S.rows.find(x => x['Nomor SPD'] === nomor);
-  if (!r) return ui.alert('Nomor surat tidak ditemukan.');
-  const I = induk_('SPD', nomor, r), J = JENIS.SPD, id = String(r['ID Baris']);
-  const isi = '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda mendapat <b>' + J.surat + '</b> dengan rincian berikut. Mohon konfirmasi kesediaan Anda:</p>' +
-    tabelDetail_('SPD', r, I, true) + '<p style="margin-top:18px">' + tombol_(linkAksi_(J.k, id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_(J.k, id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
-  const subj = 'Konfirmasi ' + J.kata + ' ' + ringkasTanggal_('SPD', r, I);
-  const hasil = [];
-  hasil.push('A (sendiri): ' + (kirimEmail_(ke, '[TES A] ' + subj, isi) || 'terkirim'));
-  Utilities.sleep(30000);
-  hasil.push('B (beruntun): ' + (kirimEmail_(ke, '[TES B] ' + subj, isi) || 'terkirim'));
-  hasil.push('C (beruntun): ' + (kirimEmail_(ke, '[TES C] ' + subj, isi) || 'terkirim'));
-  logAksi_('SPD', nomor, 'TES EMAIL 2', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Email Log Search untuk ' + ke + ': status TES A, TES B, TES C.\n(Tombol di email tes ini adalah link asli — jangan diklik.)');
-}
-
-/** Diagnosa 3: isi email konfirmasi dipecah per bagian (jeda 30 detik) untuk mencari bagian yang ditolak Gmail. */
-function menuTesEmail3() {
-  const ui = SpreadsheetApp.getUi();
-  const r1 = ui.prompt('Tes email per bagian', 'Alamat email tujuan tes:', ui.ButtonSet.OK_CANCEL);
-  if (r1.getSelectedButton() !== ui.Button.OK) return;
-  const r2 = ui.prompt('Tes email per bagian', 'Nomor Surat Perintah Dinas yang dipakai isinya:', ui.ButtonSet.OK_CANCEL);
-  if (r2.getSelectedButton() !== ui.Button.OK) return;
-  const ke = r1.getResponseText().trim(), nomor = r2.getResponseText().trim();
-  const r = bacaBaris_('SPD').rows.find(x => x['Nomor SPD'] === nomor);
-  if (!r) return ui.alert('Nomor surat tidak ditemukan.');
-  const I = induk_('SPD', nomor, r), id = String(r['ID Baris']);
-  const tabel = rows => '<table style="border-collapse:collapse;width:100%;font-size:13px">' + rows.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
-    escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
-  const umum = [['Nomor SPD', nomor], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
-    ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'], ['Transportasi', I['Transportasi']]];
-  const uang = [['Uang Saku', rpH_(r['Uang Saku'])], ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']];
-  const tombol = '<p style="margin-top:18px">' + tombol_(linkAksi_('dk', id, 'ya'), '✅ Bersedia', '#1E7B4A') + tombol_(linkAksi_('dk', id, 'tidak'), '❌ Tidak Bersedia', '#B42318') + '</p>';
-  const v = [
-    ['TES D — tanpa nominal uang + tombol', tabel(umum) + tombol],
-    ['TES E — tabel lengkap tanpa tombol', tabel(umum.concat(uang))],
-    ['TES F — hanya nominal uang + tombol', tabel(uang) + tombol],
-    ['TES G — tabel lengkap + tombol, judul netral', tabel(umum.concat(uang)) + tombol]
-  ];
-  const hasil = v.map((x, i) => { if (i) Utilities.sleep(30000);
-    return x[0] + ': ' + (kirimEmail_(ke, x[0] === v[3][0] ? '[TES G] Surat Perintah ' + nomor : '[' + x[0].slice(0, 5) + '] Konfirmasi Dinas Luar ' + I['Tempat Tujuan'], '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p>' + x[1]) || 'terkirim'); });
-  logAksi_('SPD', nomor, 'TES EMAIL 3', ke, hasil.join(' | '));
-  ui.alert('Selesai.\n\n' + hasil.join('\n') + '\n\nCek Email Log Search: status TES D, E, F, G. (Jangan klik tombol di email tes.)');
+/** Hapus sheet sisa fitur pengecekan KantorKu terjadwal (tidak dipakai lagi); sheet lain yang tidak dikenal hanya dilaporkan. */
+function hapusSheetTakTerpakai() {
+  const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActiveSpreadsheet();
+  const hapus = ['Cek KantorKu', 'Verifikasi Lembur'];
+  const dipakai = [SH.KARYAWAN, 'Data Karyawan', 'Master Karyawan', SH.PARAM, SH.PILIHAN, SH.LIBUR, SH.SPL, SH.SPD, SH.PERSONEL, SH.BIAYA, SH.LOG,
+    'Ptj SPD', 'Ptj Personel SPD', 'Ptj Biaya SPD', 'Perubahan SPD', 'Perpanjangan Personel'];
+  const ada = ss.getSheets().map(s => s.getName());
+  const target = ada.filter(n => hapus.indexOf(n) >= 0), lain = ada.filter(n => hapus.indexOf(n) < 0 && dipakai.indexOf(n) < 0);
+  if (!target.length) return ui.alert('Tidak ada sheet sisa pengecekan KantorKu.' + (lain.length ? '\n\nSheet lain di luar sistem (tidak dihapus): ' + lain.join(', ') : ''));
+  if (ui.alert('Hapus sheet tidak terpakai', 'Sheet berikut akan DIHAPUS permanen:\n• ' + target.join('\n• ') + '\n\nLanjutkan?', ui.ButtonSet.YES_NO) !== ui.Button.YES) return;
+  target.forEach(n => ss.deleteSheet(ss.getSheetByName(n)));
+  logAksi_('SPL', '-', 'HAPUS SHEET', '', target.join(', '));
+  ui.alert('Dihapus: ' + target.join(', ') + (lain.length ? '\n\nSheet lain di luar sistem (tidak dihapus, cek manual): ' + lain.join(', ') : ''));
 }
