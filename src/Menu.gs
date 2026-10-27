@@ -219,7 +219,7 @@ function lihatNomorBerikutnya() {
 /** Hapus sheet sisa fitur pengecekan KantorKu terjadwal (tidak dipakai lagi); sheet lain yang tidak dikenal hanya dilaporkan. */
 function hapusSheetTakTerpakai() {
   const ui = SpreadsheetApp.getUi(), ss = SpreadsheetApp.getActiveSpreadsheet();
-  const hapus = ['Cek KantorKu', 'Verifikasi Lembur'];
+  const hapus = ['Cek KantorKu', 'Verifikasi Lembur', 'Komentar Verifikasi'];
   const dipakai = [SH.KARYAWAN, 'Data Karyawan', 'Master Karyawan', SH.PARAM, SH.PILIHAN, SH.LIBUR, SH.SPL, SH.SPD, SH.PERSONEL, SH.BIAYA, SH.LOG,
     'Ptj SPD', 'Ptj Personel SPD', 'Ptj Biaya SPD', 'Perubahan SPD', 'Perpanjangan Personel'];
   const ada = ss.getSheets().map(s => s.getName());
