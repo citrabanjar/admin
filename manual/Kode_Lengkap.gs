@@ -14,7 +14,7 @@ const SH = {
   SPL: 'Data SPL', SPD: 'Data SPD', PERSONEL: 'Personel SPD', BIAYA: 'Biaya SPD', LOG: 'Log'
 };
 const TZ = 'Asia/Jakarta';
-const PERAN = ['KARYAWAN', 'ADMIN', 'OWNER'];   // OWNER = pemilik: atasannya diri sendiri, menerima rekap lembur semua admin, tidak bisa diberi surat; ADMIN = boleh login form & membuat surat
+const PERAN = ['KARYAWAN', 'ADMIN', 'OWNER', 'APPROVAL'];   // APPROVAL = penyetuju lembur di KantorKu: tidak bisa login form, bisa diberi lembur, menerima rekap lembur seluruh karyawan;   // OWNER = pemilik: atasannya diri sendiri, menerima rekap lembur semua admin, tidak bisa diberi surat; ADMIN = boleh login form & membuat surat
 const NAMA_HARI = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
 
 /* ---------- Akses spreadsheet (aman juga saat dipanggil dari Web App) ---------- */
@@ -480,6 +480,8 @@ function cekDataKaryawan() {
   const Kmap = karyawan_();
   const owner = aktif.filter(isOwner_);
   if (!owner.length) masalah.push({ j: '⚠ Belum ada OWNER', isi: ['Isi Peran = OWNER untuk pemilik (menerima rekap lembur semua admin).'] });
+  const appr = aktif.filter(k => k.peran === 'APPROVAL');
+  if (appr.some(o => !o.email)) masalah.push({ j: '❌ APPROVAL tanpa email (tidak menerima rekap lembur)', isi: appr.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
   if (owner.some(o => !o.email)) masalah.push({ j: '❌ OWNER tanpa email (tidak menerima rekap)', isi: owner.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
   const tanpaAtasan = aktif.filter(k => !k.atasan && !isOwner_(k));
   if (tanpaAtasan.length) masalah.push({ j: '⚠ Atasan belum diisi (' + tanpaAtasan.length + ' orang) — persetujuan lembur mereka dikirim ke admin', isi: tanpaAtasan.map(k => k.id + ' — ' + k.nama) });
@@ -1590,6 +1592,16 @@ function rekapSPL_(nomor, paksa, sudah) {
     kirimRekap_(own.map(o => o.email).join(','), hari, file, pdf, lama.length > 0, 'Semua Admin', true, 'O.' + own[0].id + '.' + tgl, Object.assign({}, own[0], { semua: true }));
     logAksi_('SPL', nomor, lama.length ? 'PDF REKAP OWNER DIPERBARUI' : 'PDF REKAP OWNER', own.map(o => o.email).join(','), file.getUrl());
     hasil.push('PDF rekap owner dikirim ke ' + own.map(o => o.nama).join(', '));
+    kirimRekapApproval_(hari, file, pdf, lama.length > 0, nomor, hasil);
+  }
+  if (!own.length && !sudah.owner && (paksa || (fin(hari) && hari.some(r => !r['Link PDF Owner'])))) {   // tanpa owner: approval tetap menerima rekap
+    sudah.owner = 1;
+    const lama = [...new Set(hari.map(r => r['Link PDF Owner']).filter(Boolean))];
+    const pdf = buatPdfSPL_(hari, { estimasi: true, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - Semua Admin' });
+    const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
+    lama.forEach(hapusPdfLama_);
+    hari.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Owner': file.getUrl() }));
+    kirimRekapApproval_(hari, file, pdf, lama.length > 0, nomor, hasil);
   }
 
   // 3. rekap atasan di atas atasan langsung (selain owner) — karyawan di bawah kewenangannya, dengan estimasi & tombol batal
@@ -1610,6 +1622,15 @@ function rekapSPL_(nomor, paksa, sudah) {
     hasil.push('PDF rekap atasan dikirim ke ' + a.nama);
   });
   return hasil.join('\n');
+}
+/** Peran APPROVAL: penyetuju lembur di aplikasi KantorKu — menerima rekap lembur seluruh karyawan (sama dengan owner, tanpa tombol pembatalan) */
+function approval_() { return Object.values(karyawan_()).filter(k => k.aktif && k.email && k.peran === 'APPROVAL'); }
+function kirimRekapApproval_(hari, file, pdf, revisi, nomor, hasil) {
+  approval_().forEach(a => {
+    kirimRekap_(a.email, hari, file, pdf, revisi, 'Semua Admin', true, null, Object.assign({}, a, { semua: true, approval: true }));
+    logAksi_('SPL', nomor, revisi ? 'PDF REKAP APPROVAL DIPERBARUI' : 'PDF REKAP APPROVAL', a.email, file.getUrl());
+    hasil.push('PDF rekap approval dikirim ke ' + a.nama);
+  });
 }
 /** "DISETUJUI 2 orang · DITOLAK 1 orang · ..." (hanya status yang ada) */
 function ringkasStatus_(rows) {
@@ -1637,6 +1658,8 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
       nAda(ST.BATAL) ? [['Dibatalkan', nAda(ST.BATAL) + ' orang']] : [],
       belum ? [['Belum selesai diproses', belum + ' orang']] : [])
       .map(x => '<tr><td style="padding:3px 12px 3px 0">' + x[0] + '</td><td style="padding:3px 0">: <b>' + x[1] + '</b></td></tr>').join('') + '</table>' +
+    (atasan.approval ? '<p style="margin-top:14px">Mohon lakukan <b>approval pengajuan lembur di aplikasi KantorKu</b> satu per satu untuk karyawan berstatus <b>DISETUJUI</b> pada rekap terlampir ' +
+      '(nama, tanggal & jam lembur sesuai rekap). Pengajuan karyawan yang tidak tercantum / tidak berstatus DISETUJUI tidak perlu disetujui.</p>' : '') +
     (batalId && rows.some(r => BISA_BATAL_(r)) ? '<p style="margin-top:18px;border-top:1px solid #eee;padding-top:12px">Bila lembur di atas tidak diperlukan, Anda dapat membatalkan seluruhnya:<br>' +
       tombol_(linkAksi_('b', batalId), '🚫 Batalkan Lembur', '#B42318') + '</p>' : '')
   ) : '<p>Rekap <b>Surat Perintah Lembur ' + escH_(tgl) + '</b>' + (label ? ' — ' + escH_(label.charAt(0).toLowerCase() + label.slice(1)) : '') + '.</p>' +

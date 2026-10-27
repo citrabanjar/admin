@@ -153,6 +153,8 @@ function cekDataKaryawan() {
   const Kmap = karyawan_();
   const owner = aktif.filter(isOwner_);
   if (!owner.length) masalah.push({ j: '⚠ Belum ada OWNER', isi: ['Isi Peran = OWNER untuk pemilik (menerima rekap lembur semua admin).'] });
+  const appr = aktif.filter(k => k.peran === 'APPROVAL');
+  if (appr.some(o => !o.email)) masalah.push({ j: '❌ APPROVAL tanpa email (tidak menerima rekap lembur)', isi: appr.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
   if (owner.some(o => !o.email)) masalah.push({ j: '❌ OWNER tanpa email (tidak menerima rekap)', isi: owner.filter(o => !o.email).map(k => k.id + ' — ' + k.nama) });
   const tanpaAtasan = aktif.filter(k => !k.atasan && !isOwner_(k));
   if (tanpaAtasan.length) masalah.push({ j: '⚠ Atasan belum diisi (' + tanpaAtasan.length + ' orang) — persetujuan lembur mereka dikirim ke admin', isi: tanpaAtasan.map(k => k.id + ' — ' + k.nama) });
