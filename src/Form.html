@@ -1066,19 +1066,27 @@ async function unduhPdf(a, url) {
   } catch (e) { if (!sesiHabis(e)) alert(errText(e)); }
   a.textContent = t;
 }
+/** Nama atasan di samping status: menunggu / disetujui / ditolak oleh siapa */
+function ketAtasan(o) {
+  if (!o.atasan) return '';
+  const st = String(o.status);
+  if (st === 'MENUNGGU ATASAN') return ' <span class="sub">— menunggu ' + esc(sdr_(o.atasan)) + '</span>';
+  if (st === 'DISETUJUI' || st === 'DITOLAK') return ' <span class="sub">— oleh ' + esc(sdr_(o.atasan)) + '</span>';
+  return '';
+}
 function kartu(x) {
   const kelas = String(x.status).split(' ')[0];
   let info, det;
   if (x.jenis === 'SPL') {
     info = esc(x.hari) + ', ' + tglPendek(x.tanggal) + ' · ' + esc(x.statusHari) + ' · ' + x.orang.length + ' orang';
     det = x.orang.map(o => '• <b>' + esc(o.nama) + '</b> ' + esc(o.mulai) + '–' + esc(o.selesai) + ' (' + fmtJam(o.jam) + ' jam) — ' + esc(o.uraian) +
-      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '') +
+      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' + ketAtasan(o) : '') +
       (o.batalOleh ? '<div class="sub" style="margin-left:12px">Dibatalkan oleh <b>' + esc(o.batalOleh) + '</b>' + (o.alasanBatal ? ' — ' + esc(o.alasanBatal) : '') + '</div>' : '')).join('<br>') +
       (x.pdf ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdf) + '\');return false">📄 Unduh PDF</a>' : '');
   } else {
     info = esc(x.tempat) + ' · ' + tglPendek(x.berangkat) + ' s/d ' + tglPendek(x.kembali) + ' · ' + x.orang.length + ' orang · kas ' + rp(x.uangKas || 0);
     det = '<i>' + esc(x.maksud) + '</i><br>' + x.orang.map(o => '• <b>' + esc(o.nama) + '</b> (' + o.lama + ' hari)' + (o.keterangan ? ' — ' + esc(o.keterangan) : '') +
-      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' : '')).join('<br>') +
+      (o.status ? '<span class="so ' + esc(String(o.status).split(' ')[0]) + '">' + esc(o.status) + '</span>' + ketAtasan(o) : '')).join('<br>') +
       (x.pdf ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdf) + '\');return false">📄 Unduh PDF surat</a>' : '') +
       (x.pdfLaporan ? '<br><a href="#" onclick="event.stopPropagation();unduhPdf(this,\'' + esc(x.pdfLaporan) + '\');return false">📄 Unduh laporan pertanggungjawaban</a>' : '');
   }

@@ -110,7 +110,8 @@ function riwayatSPD(token) {
   if (!punyaAkses_(u, 'DINAS') && !punyaAkses_(u, 'PTJ')) return [];
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });
+    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '',
+      atasan: String(r['Disetujui Oleh'] || r['Atasan'] || '').replace(/^\(.*\)$/, '') });
   });
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Email Pembuat']).toLowerCase() === u.email)

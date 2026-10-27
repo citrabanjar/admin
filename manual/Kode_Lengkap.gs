@@ -877,7 +877,8 @@ function riwayatSPL(token) {
     };
     g[n].orang.push({ nama: r['Full Name'], mulai: String(r['Jam Mulai']), selesai: String(r['Jam Selesai']),
       jam: Number(r['Jam Efektif']) || 0, uraian: r['Uraian Pekerjaan'], status: r['Status'],
-      batalOleh: r['Dibatalkan Oleh'] || '', alasanBatal: r['Alasan Pembatalan'] || '' });
+      batalOleh: r['Dibatalkan Oleh'] || '', alasanBatal: r['Alasan Pembatalan'] || '',
+      atasan: String(r['Disetujui Oleh'] || r['Atasan'] || '').replace(/^\(.*\)$/, '') });
     g[n].totalJam += Number(r['Jam Efektif']) || 0;
   });
   return Object.values(g).map(x => {
@@ -998,7 +999,8 @@ function riwayatSPD(token) {
   if (!punyaAkses_(u, 'DINAS') && !punyaAkses_(u, 'PTJ')) return [];
   const per = {};
   bacaTabel_(SH.PERSONEL, 'Nomor SPD').forEach(r => {
-    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '' });
+    (per[r['Nomor SPD']] = per[r['Nomor SPD']] || []).push({ nama: r['Full Name'], lama: Number(r['Lama (hari)']) || 0, keterangan: r['Keterangan'], status: r['Status'] || '',
+      atasan: String(r['Disetujui Oleh'] || r['Atasan'] || '').replace(/^\(.*\)$/, '') });
   });
   return bacaTabel_(SH.SPD, 'Nomor SPD')
     .filter(r => String(r['Email Pembuat']).toLowerCase() === u.email)
