@@ -245,7 +245,7 @@
           <div><label>Uang Saku / Orang</label><div class="chip" id="dSaku">–</div></div>
         </div>
         <div class="row" style="margin:12px 0 0">
-          <div style="max-width:260px"><label>Uang Kas dalam Perjalanan (Rp) *</label><input id="dKas" type="text" inputmode="numeric" autocomplete="off" placeholder="isi 0 bila tidak ada" oninput="fmtRp(this);hitungSPD()"></div>
+          <div style="max-width:260px"><label>Uang Kas Dinas (Rp) *</label><input id="dKas" type="text" inputmode="numeric" autocomplete="off" placeholder="isi 0 bila tidak ada" oninput="fmtRp(this);hitungSPD()"></div>
         </div>
       </div>
       <div class="card" style="padding:0">
@@ -260,7 +260,7 @@
       <div class="card">
         <div class="total hide"><span>Total uang saku</span><b id="tSaku">Rp 0</b></div>
         <span id="tLain" class="hide"></span><span id="tAll" class="hide"></span>
-        <div class="total"><span>Uang kas dalam perjalanan</span><b id="tKas">Rp 0</b></div>
+        <div class="total"><span>Uang kas dinas</span><b id="tKas">Rp 0</b></div>
       </div>
       <div id="dErr"></div>
       <div class="bar" style="justify-content:flex-end"><button class="btn" id="dKirim" onclick="spdKonfirmasi()">Kirim Surat</button></div>
@@ -302,14 +302,14 @@
           <label class="cek" style="margin-top:10px"><input type="checkbox" id="tSah"> Bukti pengesahan (tanda tangan &amp; stempel) di tempat tujuan sudah diterima</label>
         </div>
         <div class="card">
-          <div class="sek">Perhitungan Uang Kas dalam Perjalanan</div>
+          <div class="sek">Perhitungan Uang Kas Dinas</div>
           <label>Pembayaran uang saku *</label>
           <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px">
             <label class="cek"><input type="radio" name="tSakuCara" value="setelah" checked onchange="hitungPtj()"> Dibayarkan setelah dinas selesai</label>
-            <label class="cek"><input type="radio" name="tSakuCara" value="kas" onchange="hitungPtj()"> Diambil dari uang kas dalam perjalanan</label>
+            <label class="cek"><input type="radio" name="tSakuCara" value="kas" onchange="hitungPtj()"> Diambil dari uang kas dinas</label>
           </div>
           <div class="tot3">
-            <div><span class="sub">Uang kas dalam perjalanan</span><b id="tRen">-</b></div>
+            <div><span class="sub">Uang kas dinas</span><b id="tRen">-</b></div>
             <div><span class="sub">Biaya lainnya (realisasi)</span><b id="tRea">-</b></div>
             <div><span class="sub" id="tSelL">Harus dikembalikan</span><b id="tSel">-</b></div>
           </div>
@@ -721,7 +721,7 @@ function hitungSPD(tglBerubah) {
   if (!$('dTrans').value) umum.push('Pilih transportasi.');
   if (!$('dSumber').value) umum.push('Pilih sumber biaya.');
   const kas = nilaiRp($('dKas'));
-  if (kas === '' || !(Number(kas) >= 0)) umum.push('Isi uang kas dalam perjalanan (isi 0 bila tidak ada).');
+  if (kas === '' || !(Number(kas) >= 0)) umum.push('Isi uang kas dinas (isi 0 bila tidak ada).');
   $('tKas').textContent = rp(Number(kas) || 0);
   if (!per.length) umum.push('Isi minimal 1 personel.');
   const warn = h.peringatan;
@@ -745,7 +745,7 @@ function spdKonfirmasi() {
   if (!SPD_OK) { if (umum.length) pesan('dErr', 'err', umum.map(esc).join('<br>')); return; }
   const d = spdData();
   modal('<h3 style="margin-top:0">Kirim Surat Perintah Dinas</h3><p><b>' + esc(d.tempat) + '</b> · ' + tglPendek(d.berangkat) + ' s/d ' + tglPendek(d.kembali) +
-    '<br><b>' + d.personel.length + '</b> karyawan<br>Uang kas dalam perjalanan <b>' + rp(d.uangKas) + '</b></p>' +
+    '<br><b>' + d.personel.length + '</b> karyawan<br>Uang kas dinas <b>' + rp(d.uangKas) + '</b></p>' +
     '<div class="bar" style="justify-content:flex-end"><button class="btn sec" onclick="tutupModal()">Periksa lagi</button><button class="btn" id="bYa" onclick="spdKirim()">Ya, kirim</button></div>');
 }
 async function spdKirim() {
@@ -861,7 +861,7 @@ async function kirimPulang(nomor) {
 }
 function tambahKasModal(nomor) {
   const x = OPEN.find(o => o.nomor === nomor); if (!x) return;
-  modal('<h3 style="margin-top:0">Tambah Uang Kas dalam Perjalanan</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + '<br>Uang kas saat ini: <b>' + rp(x.uangKas) + '</b>' +
+  modal('<h3 style="margin-top:0">Tambah Uang Kas Dinas</h3><p><b>' + esc(x.nomor) + '</b><br>' + esc(x.tempat) + '<br>Uang kas saat ini: <b>' + rp(x.uangKas) + '</b>' +
     (x.ketua ? '<br>Ketua tim: <b>' + esc(x.ketua.nama) + '</b>' : '') + '</p>' +
     '<label>Nominal tambahan (Rp) *</label><input id="mNom" type="text" inputmode="numeric" autocomplete="off" oninput="fmtRp(this)">' +
     '<label style="margin-top:10px">Keperluan / alasan *</label><textarea id="mAlasan" rows="3"></textarea>' +
@@ -901,7 +901,7 @@ function pilihPtj(nomor) {
   $('ptjList').classList.add('hide'); $('ptjForm').classList.remove('hide');
   $('ptjInfo').innerHTML = '<div class="sek">A. Surat Perintah Dinas</div><b style="font-size:16px">' + esc(PT.nomor) + '</b>' +
     '<div class="sub" style="font-size:13px;margin-top:4px">' + esc(PT.maksud) + '<br>Tujuan: <b>' + esc(PT.tempat) + '</b> · Rencana ' + tglPanjang(PT.berangkat) + ' s/d ' + tglPanjang(PT.kembali) +
-    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '<br>Uang kas dalam perjalanan: <b>' + rp(PT.uangKas || 0) + '</b>' +
+    ' (' + PT.lama + ' hari) · ' + esc(PT.transportasi || '') + (PT.customer ? ' · ' + esc(PT.customer) : '') + '<br>Uang kas dinas: <b>' + rp(PT.uangKas || 0) + '</b>' +
     (PT.tambahKas.length ? ' (awal ' + rp(PT.kasAwal) + ' + tambahan ' + rp(PT.uangKas - PT.kasAwal) + ')' : '') + (PT.ketua ? '<br>Ketua tim: <b>' + esc(PT.ketua.nama) + '</b>' : '') + '</div>';
   document.querySelector('input[name=tSakuCara][value=setelah]').checked = true;
   $('tBrk').value = PT.berangkat; $('tKmb').value = PT.kembali; $('tRingkas').value = ''; $('tSah').checked = false;
@@ -1006,7 +1006,7 @@ function hitungPtj() {
   $('tRea').previousElementSibling.textContent = dariKas ? 'Biaya lainnya + uang saku' : 'Biaya lainnya (realisasi)';
   $('tSakuInfo').innerHTML = (PT.tambahKas && PT.tambahKas.length ? 'Uang kas: awal ' + rp(PT.kasAwal) + PT.tambahKas.map(t => ' + tambahan ' + rp(t.nominal)).join('') + '.<br>' : '') +
     (sakuKasir ? 'Uang saku <b>' + rp(sakuKasir) + '</b> personel yang lapor pulang lebih dulu sudah dibayar kasir (tidak termasuk perhitungan).<br>' : '') +
-    'Uang saku <b>' + rp(saku) + '</b> ' + (dariKas ? 'diambil dari uang kas dalam perjalanan (mengurangi sisa kas).' : 'dibayarkan setelah dinas selesai (tidak termasuk perhitungan uang kas).');
+    'Uang saku <b>' + rp(saku) + '</b> ' + (dariKas ? 'diambil dari uang kas dinas (mengurangi sisa kas).' : 'dibayarkan setelah dinas selesai (tidak termasuk perhitungan uang kas).');
   $('tSelL').textContent = sisa < 0 ? 'Kekurangan kas — dipotong dari gaji ketua tim' + (PT.ketua ? ' (Sdr. ' + PT.ketua.nama + ')' : '') : 'Uang kas harus dikembalikan';
   $('tSel').textContent = rp(Math.abs(sisa));
   PTJ_OK = !e.length; $('tSimpan').disabled = !PTJ_OK; $('tSimpan').title = [...new Set(e)].join('\n');

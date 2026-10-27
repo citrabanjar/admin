@@ -6,7 +6,7 @@
  *      Persetujuan oleh atasan penyetuju dinas (1 email + 1 tombol per atasan),
  *      owner mendapat pemberitahuan (mengetahui). Setelah semua atasan memproses →
  *      lama & uang saku personel diperbarui, PDF surat direvisi.
- *   2. TAMBAH KAS — admin mencatat tambahan uang kas dalam perjalanan. Ketua tim
+ *   2. TAMBAH KAS — admin mencatat tambahan uang kas dinas. Ketua tim
  *      (personel disetujui No. 1) menerima email + PDF revisi dan mengonfirmasi
  *      sudah menerima uang kas tambahan.
  *  Link email: a=pp (persetujuan perpanjangan), a=kt (konfirmasi terima kas).
@@ -329,8 +329,8 @@ function kirimTambahKas_(id) {
   const U = bacaUbah_(SH_UBAH.UBAH), r = U.rows.find(x => String(x['ID']) === String(id));
   if (!r) return;
   const nomor = r['Nomor SPD'], total = (Number(induk_('SPD', nomor)['Uang Kas Perjalanan']) || 0) + tambahanKas_(nomor);
-  const ringkas = '<p>Uang kas dalam perjalanan ditambah sebesar <b>' + rpH_(r['Tambah Kas']) + '</b> — keperluan: ' + escH_(r['Alasan']) + '.<br>' +
-    'Total uang kas dalam perjalanan menjadi <b>' + rpH_(total) + '</b>.</p>';
+  const ringkas = '<p>Uang kas dinas ditambah sebesar <b>' + rpH_(r['Tambah Kas']) + '</b> — keperluan: ' + escH_(r['Alasan']) + '.<br>' +
+    'Total uang kas dinas menjadi <b>' + rpH_(total) + '</b>.</p>';
   const R = kirimRevisiSpd_(nomor, 'Tambahan Uang Kas Dinas', ringkas, [], false, r['Email Pembuat'], true);
   const ketua = R && R.ketua;
   if (!ketua || !ketua.email) { ubahBaris_(U, r._row, { 'Status Email': 'GAGAL: ketua tim tanpa email' }); return; }
@@ -350,7 +350,7 @@ function halamanTerimaKas_(p) {
     const I = induk_('SPD', r['Nomor SPD']);
     const serah = r['Jenis'] === 'SERAH KAS';
     isi = '<h2>Konfirmasi ' + (serah ? 'Serah Terima' : 'Tambahan') + ' Uang Kas</h2><p><b>' + escH_(r['Nomor SPD']) + '</b><br>' + escH_(I['Tempat Tujuan']) + '</p>' +
-      '<p>' + (serah ? 'Uang kas yang diterima' : 'Tambahan uang kas dalam perjalanan') + ': <b>' + rpH_(r['Tambah Kas']) + '</b><br>' + (serah ? '' : 'Keperluan: ') + escH_(r['Alasan']) + '</p>';
+      '<p>' + (serah ? 'Uang kas yang diterima' : 'Tambahan uang kas dinas') + ': <b>' + rpH_(r['Tambah Kas']) + '</b><br>' + (serah ? '' : 'Keperluan: ') + escH_(r['Alasan']) + '</p>';
     if (r['Status'] === UBAH_ST.DITERIMA) isi += '<div class="msg info">Sudah dikonfirmasi diterima' + (r['Dikonfirmasi Pada'] instanceof Date ? ' pada ' + waktuIndo_(r['Dikonfirmasi Pada']) : '') + '.</div>';
     else isi += '<button id="b" onclick="kirim()">✅ Saya sudah menerima uang kas' + (serah ? '' : ' tambahan') + '</button><div id="o"></div>' +
       '<script>function kirim(){var b=document.getElementById("b"),o=document.getElementById("o");b.disabled=true;b.textContent="Mengirim…";' +
@@ -377,7 +377,7 @@ function prosesTerimaKas(id, sig) {
     logAksi_('SPD', r['Nomor SPD'], 'TAMBAH KAS DITERIMA', ketua ? ketua.email : '', rpH_(r['Tambah Kas']));
   } finally { lock.releaseLock(); }
   kirimEmail_(r['Email Pembuat'], (r['Jenis'] === 'SERAH KAS' ? 'Serah Terima' : 'Tambahan') + ' Uang Kas Diterima — ' + r['Nomor SPD'],
-    '<p><b>' + escH_(sdr_(ketua ? ketua.nama : '-')) + '</b> telah mengonfirmasi <b style="color:#1E7B4A">SUDAH MENERIMA</b> ' + (r['Jenis'] === 'SERAH KAS' ? 'serah terima' : 'tambahan') + ' uang kas dalam perjalanan sebesar <b>' +
+    '<p><b>' + escH_(sdr_(ketua ? ketua.nama : '-')) + '</b> telah mengonfirmasi <b style="color:#1E7B4A">SUDAH MENERIMA</b> ' + (r['Jenis'] === 'SERAH KAS' ? 'serah terima' : 'tambahan') + ' uang kas dinas sebesar <b>' +
     rpH_(r['Tambah Kas']) + '</b> untuk Surat Perintah Dinas ' + escH_(r['Nomor SPD']) + '.</p><p>' + escH_(r['Alasan']) + '</p>');
   return 'Terima kasih. Penerimaan uang kas ' + rpH_(r['Tambah Kas']) + ' telah dikonfirmasi.';
 }
@@ -472,14 +472,14 @@ function laporPulang(token, d) {
     escH_(hariIndo_(keTanggal_(hasil.pulang)) + ', ' + tglIndo_(keTanggal_(hasil.pulang))) + '</b> — lama dinas ' + hasil.lama + ' hari.</p>' +
     '<p>Uang saku <b>' + rpH_(hasil.uangSaku) + '</b> dibayarkan oleh kasir di kantor (tidak termasuk pertanggungjawaban ketua tim). ' +
     'Karyawan dapat diajukan lembur kembali mulai hari berikutnya.</p>' +
-    (hasil.serah ? '<p>Uang kas dalam perjalanan sebesar <b>' + rpH_(hasil.serah.nominal) + '</b> diserahkan kepada <b>' + escH_(hasil.serah.ke) + '</b> sebagai ketua tim baru ' +
+    (hasil.serah ? '<p>Uang kas dinas sebesar <b>' + rpH_(hasil.serah.nominal) + '</b> diserahkan kepada <b>' + escH_(hasil.serah.ke) + '</b> sebagai ketua tim baru ' +
       '(menunggu konfirmasi penerimaan). Kekurangan kas di pertanggungjawaban akhir menjadi tanggungan ketua tim baru.</p>' : '') +
     '<p>Dicatat oleh ' + escH_(sdr_(u.nama)) + '.</p>', admin && admin !== pembuat ? admin : '');
   if (hasil.serah) {
     const k = karyawan_()[hasil.serah.keId], I = induk_('SPD', hasil.nomor);
     if (k && k.email) {
       const err = kirimEmail_(k.email, 'Serah Terima Uang Kas Dinas ' + hasil.nomor,
-        '<p>Yth. <b>' + escH_(sdr_(k.nama)) + '</b>,</p><p><b>' + escH_(hasil.serah.dari) + '</b> pulang lebih dulu. Anda ditunjuk sebagai <b>ketua tim</b> dan menerima uang kas dalam perjalanan sebesar <b>' +
+        '<p>Yth. <b>' + escH_(sdr_(k.nama)) + '</b>,</p><p><b>' + escH_(hasil.serah.dari) + '</b> pulang lebih dulu. Anda ditunjuk sebagai <b>ketua tim</b> dan menerima uang kas dinas sebesar <b>' +
         rpH_(hasil.serah.nominal) + '</b>.</p>' + tabelRingkasDinas_({ 'Full Name': k.nama, 'Employee ID': k.id, 'Uang Saku': 0 }, I).replace(/<tr><td[^>]*>Uang Saku<\/td><td[^>]*>[^<]*<\/td><\/tr>/, '').replace('>Personel<', '>Ketua Tim<') +
         '<p>Mohon konfirmasi bahwa Anda sudah menerima uang kas tersebut:</p><p style="margin-top:14px">' + tombol_(linkAksi_('kt', hasil.serah.id), '✅ Sudah Diterima', '#1E7B4A') + '</p>' +
         '<p>Sebagai ketua tim, Anda melaporkan uang kas, biaya &amp; bukti kepada admin setelah dinas selesai.</p>');

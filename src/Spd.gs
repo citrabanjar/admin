@@ -40,7 +40,7 @@ function simpanSPD(token, d) {
     if (!teks(d.transportasi)) err.push('Transportasi wajib dipilih.');
     if (!teks(d.sumberBiaya)) err.push('Sumber biaya wajib dipilih.');
     const uangKas = Number(d.uangKas);
-    if (d.uangKas === '' || d.uangKas == null || !(uangKas >= 0)) err.push('Uang kas dalam perjalanan wajib diisi (isi 0 bila tidak ada).');
+    if (d.uangKas === '' || d.uangKas == null || !(uangKas >= 0)) err.push('Uang kas dinas wajib diisi (isi 0 bila tidak ada).');
 
     const personel = (d.personel || []).filter(p => p && teks(p.id)).map(p => Object.assign({}, p, { id: teks(p.id).toUpperCase() }));
     const biaya = (d.biaya || []).filter(b => b && (teks(b.jenis) || Number(b.jumlah)));

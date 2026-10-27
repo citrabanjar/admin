@@ -119,7 +119,7 @@ function bungkusEmail_(isi) {
 function tombol_(href, teks, warna) {
   return '<a href="' + href + '" style="display:inline-block;background:' + warna + ';color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;margin:4px 8px 4px 0">' + teks + '</a>';
 }
-/** Uang kas dalam perjalanan = kas awal + tambahan kas */
+/** Uang kas dinas = kas awal + tambahan kas */
 function kasTotal_(I) { return (Number(I['Uang Kas Perjalanan']) || 0) + (Number(I['Tambahan Kas']) || 0); }
 function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
   const baris = jenis === 'SPL' ? [
@@ -138,7 +138,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
     ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
-  ].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
+  ].concat(kasTotal_(I) ? [['Uang Kas Dinas', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
     ['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]   // Surat Perintah Dinas diperintahkan langsung oleh owner
@@ -184,7 +184,7 @@ function kirimKonfirmasi_(jenis, nomor) {
 function tabelRingkasDinas_(r, I) {
   const baris = [['Nomor SPD', I['Nomor SPD']], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
     ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
-    ['Transportasi', I['Transportasi']]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
+    ['Transportasi', I['Transportasi']]].concat(kasTotal_(I) ? [['Uang Kas Dinas', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
     [['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
     escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
@@ -717,7 +717,7 @@ function buatPdfSPD_(I, rows) {
         ['Tgl. Berangkat', hariIndo_(tglB) + ', ' + tglIndo_(tglB), 'Tgl. Kembali', hariIndo_(tglK) + ', ' + tglIndo_(tglK)],
         ['Lama Dinas', I['Lama (hari)'] + ' hari', 'Transportasi', I['Transportasi']],
         ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
-        ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
+        ['Uang Kas Dinas', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
     sek('C. KARYAWAN YANG DITUGASKAN') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Keterangan'].map(thP_).join('') + '</tr>' +
     setuju.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +

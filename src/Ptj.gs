@@ -142,7 +142,7 @@ function simpanPtjSPD(token, d) {
     const sakuReal = per.reduce((s, p) => s + p.uangSaku, 0);
     const lainReal = biaya.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
     const totRencana = S.uangSakuRencana + S.biayaRencana, totReal = sakuReal + lainReal;
-    const sakuDariKas = !!d.sakuDariKas;   // uang saku diambil dari uang kas dalam perjalanan
+    const sakuDariKas = !!d.sakuDariKas;   // uang saku diambil dari uang kas dinas
     const sakuKasir = per.filter(p => p.kasir).reduce((s, p) => s + p.uangSaku, 0), sakuSisa = sakuReal - sakuKasir;   // yang lapor pulang lebih dulu sudah dibayar kasir
     const kasKembali = S.uangKas - lainReal - (sakuDariKas ? sakuSisa : 0);   // + = dikembalikan, - = kekurangan (dipotong dari gaji ketua tim)
     const ketua = S.ketua ? S.ketua.nama : '-';
@@ -176,9 +176,9 @@ function simpanPtjSPD(token, d) {
     SpreadsheetApp.flush();
 
     const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(sdr_(u.nama)) + '.</p>' +
-      '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + (sakuDariKas && sakuSisa ? ' − uang saku ' + rpH_(sakuSisa) : '') + ' = <b>' + kasTeks_(kasKembali, ketua) + '</b>.<br>' +
+      '<p>Uang kas dinas ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + (sakuDariKas && sakuSisa ? ' − uang saku ' + rpH_(sakuSisa) : '') + ' = <b>' + kasTeks_(kasKembali, ketua) + '</b>.<br>' +
       (sakuKasir ? 'Uang saku ' + rpH_(sakuKasir) + ' (personel yang lapor pulang lebih dulu) sudah dibayar kasir. ' : '') +
-      (sakuSisa ? 'Uang saku ' + rpH_(sakuSisa) + (sakuDariKas ? ' diambil dari uang kas dalam perjalanan.' : ' dibayarkan setelah dinas selesai.') : '') + '</p>' +
+      (sakuSisa ? 'Uang saku ' + rpH_(sakuSisa) + (sakuDariKas ? ' diambil dari uang kas dinas.' : ' dibayarkan setelah dinas selesai.') : '') + '</p>' +
       (kasKembali < 0 ? '<p><b style="color:#B42318">Status: KURANG KAS</b> — setelah kekurangan dipotong dari gaji ketua tim, catat potongannya di form Pertanggungjawaban Dinas agar surat SELESAI.</p>' : '') +
       '<p>PDF laporan terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
     const admin = String(P.EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(S.emailPembuat || u.email).toLowerCase();
@@ -211,7 +211,7 @@ function buatPdfPtj_(S, R) {
     sek('B. REALISASI PERJALANAN') +
     kv([['Berangkat Aktual', tg(R.berangkat), 'Kembali Aktual', tg(R.kembali)],
         ['Lama Aktual', R.lamaAktual + ' hari', 'Pengesahan Tujuan', R.pengesahan ? 'Diterima' : 'Belum diterima']]) +
-    sek('C. PERSONEL & UANG SAKU (' + (R.sakuDariKas ? 'DIAMBIL DARI UANG KAS DALAM PERJALANAN' : 'DIBAYARKAN SETELAH DINAS SELESAI') + ')') +
+    sek('C. PERSONEL & UANG SAKU (' + (R.sakuDariKas ? 'DIAMBIL DARI UANG KAS DINAS' : 'DIBAYARKAN SETELAH DINAS SELESAI') + ')') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'].map(thP_).join('') + '</tr>' +
     R.personel.map((p, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(p.ref.id)) + tdP_('<b>' + escH_(p.ref.nama) + '</b>') +
       tdP_(p.ref.lama + ' hari', 'text-align:center') + tdP_(p.lama + ' hari', 'text-align:center') + tdP_(rpH_(p.ref.uangSaku), 'text-align:right') +
@@ -221,16 +221,16 @@ function buatPdfPtj_(S, R) {
     (R.biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
       R.biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b.jenis)) + tdP_(escH_(b.uraian)) + tdP_(rpH_(b.jumlah), 'text-align:right') + tdP_(b.link ? '<a href="' + escH_(b.link) + '" style="color:#1F5FBF">Ada (lihat)</a>' : 'Tidak ada', 'text-align:center') + '</tr>').join('') +
       totRow('TOTAL BIAYA LAINNYA', 3, rpH_(R.lainReal), 1) + '</table>' : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
-    sek('E. PERHITUNGAN UANG KAS DALAM PERJALANAN') +
+    sek('E. PERHITUNGAN UANG KAS DINAS') +
     '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
-    [].concat(R.tambahKas && R.tambahKas.length ? [['Uang kas dalam perjalanan awal', rpH_(R.kasAwal)]].concat(R.tambahKas.map(t => ['Tambahan uang kas' + (t.tanggal ? ' ' + tglIndo_(keTanggal_(t.tanggal)) : '') + ' — ' + escH_(t.alasan), rpH_(t.nominal)])) : [],
-      [['Total uang kas dalam perjalanan (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )']],
+    [].concat(R.tambahKas && R.tambahKas.length ? [['Uang kas dinas awal', rpH_(R.kasAwal)]].concat(R.tambahKas.map(t => ['Tambahan uang kas' + (t.tanggal ? ' ' + tglIndo_(keTanggal_(t.tanggal)) : '') + ' — ' + escH_(t.alasan), rpH_(t.nominal)])) : [],
+      [['Total uang kas dinas (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )']],
       R.sakuDariKas && R.sakuSisa ? [['Dikurangi: uang saku personel (bagian C' + (R.sakuKasir ? ', tanpa yang dibayar kasir' : '') + ')', '( ' + rpH_(R.sakuSisa) + ' )']] : [],
       [[R.kasKembali >= 0 ? 'UANG KAS YANG HARUS DIKEMBALIKAN' : 'KEKURANGAN UANG KAS (dipotong dari gaji ketua tim ' + escH_(sdr_(R.ketua)) + ')', rpH_(Math.abs(R.kasKembali))]])
       .map((r, i, a) => { const akhir = i === a.length - 1; return '<tr><td style="padding:5px;border:' + (akhir ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
         (akhir ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>'; }).join('') + '</table>' +
     '<div style="font-size:9px;color:#555;margin-top:4px">' + (R.sakuKasir ? 'Uang saku ' + rpH_(R.sakuKasir) + ' untuk personel yang lapor pulang lebih dulu sudah dibayar kasir di kantor. ' : '') +
-      (R.sakuSisa ? 'Uang saku personel ' + rpH_(R.sakuSisa) + (R.sakuDariKas ? ' diambil dari uang kas dalam perjalanan.' : ' dibayarkan setelah dinas selesai dan tidak termasuk perhitungan uang kas.') : '') + '</div>' +
+      (R.sakuSisa ? 'Uang saku personel ' + rpH_(R.sakuSisa) + (R.sakuDariKas ? ' diambil dari uang kas dinas.' : ' dibayarkan setelah dinas selesai dan tidak termasuk perhitungan uang kas.') : '') + '</div>' +
     sek('F. RINGKASAN HASIL KEGIATAN') +
     '<div style="border:1px solid #BBB;padding:8px;font-size:10px;white-space:pre-wrap;min-height:40px">' + escH_(R.ringkasan) + '</div>' +
     '<p style="text-align:right;font-size:10px;margin-top:12px">' + (param_().KOTA_SURAT ? escH_(param_().KOTA_SURAT) + ', ' : '') + tglIndo_(R.pada) + '</p>' +

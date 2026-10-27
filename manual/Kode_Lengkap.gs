@@ -928,7 +928,7 @@ function simpanSPD(token, d) {
     if (!teks(d.transportasi)) err.push('Transportasi wajib dipilih.');
     if (!teks(d.sumberBiaya)) err.push('Sumber biaya wajib dipilih.');
     const uangKas = Number(d.uangKas);
-    if (d.uangKas === '' || d.uangKas == null || !(uangKas >= 0)) err.push('Uang kas dalam perjalanan wajib diisi (isi 0 bila tidak ada).');
+    if (d.uangKas === '' || d.uangKas == null || !(uangKas >= 0)) err.push('Uang kas dinas wajib diisi (isi 0 bila tidak ada).');
 
     const personel = (d.personel || []).filter(p => p && teks(p.id)).map(p => Object.assign({}, p, { id: teks(p.id).toUpperCase() }));
     const biaya = (d.biaya || []).filter(b => b && (teks(b.jenis) || Number(b.jumlah)));
@@ -1136,7 +1136,7 @@ function bungkusEmail_(isi) {
 function tombol_(href, teks, warna) {
   return '<a href="' + href + '" style="display:inline-block;background:' + warna + ';color:#fff;text-decoration:none;font-weight:bold;padding:12px 22px;border-radius:8px;margin:4px 8px 4px 0">' + teks + '</a>';
 }
-/** Uang kas dalam perjalanan = kas awal + tambahan kas */
+/** Uang kas dinas = kas awal + tambahan kas */
 function kasTotal_(I) { return (Number(I['Uang Kas Perjalanan']) || 0) + (Number(I['Tambahan Kas']) || 0); }
 function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
   const baris = jenis === 'SPL' ? [
@@ -1155,7 +1155,7 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
     ['Tanggal Dinas', hariIndo_(I['Tgl Berangkat']) + ', ' + tglIndo_(I['Tgl Berangkat']) + ' s/d ' + hariIndo_(I['Tgl Kembali']) + ', ' + tglIndo_(I['Tgl Kembali']) + ' (' + I['Lama (hari)'] + ' hari)'],
     ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')' + (r['Job Position'] ? ' — ' + r['Job Position'] : '')],
     ['Lama Tugas', r['Lama (hari)'] + ' hari' + (r['Keterangan'] ? ' — ' + r['Keterangan'] : '')],
-  ].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
+  ].concat(kasTotal_(I) ? [['Uang Kas Dinas', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [], [
     ['Transportasi', I['Transportasi']],
     ['Customer / Dasar', [I['Nama Customer'], I['Dasar Penugasan']].filter(Boolean).join(' — ') || '-'],
     ['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]   // Surat Perintah Dinas diperintahkan langsung oleh owner
@@ -1201,7 +1201,7 @@ function kirimKonfirmasi_(jenis, nomor) {
 function tabelRingkasDinas_(r, I) {
   const baris = [['Nomor SPD', I['Nomor SPD']], ['Maksud / Tujuan', I['Maksud / Tujuan']], ['Tempat Tujuan', I['Tempat Tujuan']],
     ['Tanggal Dinas', tglIndo_(I['Tgl Berangkat']) + ' s/d ' + tglIndo_(I['Tgl Kembali'])], ['Personel', sdr_(r['Full Name']) + ' (' + r['Employee ID'] + ')'],
-    ['Transportasi', I['Transportasi']]].concat(kasTotal_(I) ? [['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
+    ['Transportasi', I['Transportasi']]].concat(kasTotal_(I) ? [['Uang Kas Dinas', rpH_(kasTotal_(I)) + ' (untuk seluruh tim, dipertanggungjawabkan setelah kembali)']] : [],
     [['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
     escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
@@ -1734,7 +1734,7 @@ function buatPdfSPD_(I, rows) {
         ['Tgl. Berangkat', hariIndo_(tglB) + ', ' + tglIndo_(tglB), 'Tgl. Kembali', hariIndo_(tglK) + ', ' + tglIndo_(tglK)],
         ['Lama Dinas', I['Lama (hari)'] + ' hari', 'Transportasi', I['Transportasi']],
         ['Sumber Biaya', I['Sumber Biaya'], 'Uang Saku / Hari', rpH_(P.UANG_SAKU_HARI)],
-        ['Uang Kas Perjalanan', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
+        ['Uang Kas Dinas', rpH_(kasTotal_(I)) + (Number(I['Tambahan Kas']) ? ' (termasuk tambahan ' + rpH_(I['Tambahan Kas']) + ')' : '')]]) +
     sek('C. KARYAWAN YANG DITUGASKAN') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Job Position', 'Lama (hari)', 'Keterangan'].map(thP_).join('') + '</tr>' +
     setuju.map((r, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>') + tdP_(escH_(r['Job Position'])) +
@@ -2255,7 +2255,7 @@ function simpanPtjSPD(token, d) {
     const sakuReal = per.reduce((s, p) => s + p.uangSaku, 0);
     const lainReal = biaya.reduce((s, b) => s + (Number(b.jumlah) || 0), 0);
     const totRencana = S.uangSakuRencana + S.biayaRencana, totReal = sakuReal + lainReal;
-    const sakuDariKas = !!d.sakuDariKas;   // uang saku diambil dari uang kas dalam perjalanan
+    const sakuDariKas = !!d.sakuDariKas;   // uang saku diambil dari uang kas dinas
     const sakuKasir = per.filter(p => p.kasir).reduce((s, p) => s + p.uangSaku, 0), sakuSisa = sakuReal - sakuKasir;   // yang lapor pulang lebih dulu sudah dibayar kasir
     const kasKembali = S.uangKas - lainReal - (sakuDariKas ? sakuSisa : 0);   // + = dikembalikan, - = kekurangan (dipotong dari gaji ketua tim)
     const ketua = S.ketua ? S.ketua.nama : '-';
@@ -2289,9 +2289,9 @@ function simpanPtjSPD(token, d) {
     SpreadsheetApp.flush();
 
     const isi = '<p>Pertanggungjawaban <b>Surat Perintah Dinas ' + escH_(S.nomor) + '</b> (' + escH_(S.tempat) + ') telah diselesaikan oleh ' + escH_(sdr_(u.nama)) + '.</p>' +
-      '<p>Uang kas dalam perjalanan ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + (sakuDariKas && sakuSisa ? ' − uang saku ' + rpH_(sakuSisa) : '') + ' = <b>' + kasTeks_(kasKembali, ketua) + '</b>.<br>' +
+      '<p>Uang kas dinas ' + rpH_(S.uangKas) + ' − biaya lainnya ' + rpH_(lainReal) + (sakuDariKas && sakuSisa ? ' − uang saku ' + rpH_(sakuSisa) : '') + ' = <b>' + kasTeks_(kasKembali, ketua) + '</b>.<br>' +
       (sakuKasir ? 'Uang saku ' + rpH_(sakuKasir) + ' (personel yang lapor pulang lebih dulu) sudah dibayar kasir. ' : '') +
-      (sakuSisa ? 'Uang saku ' + rpH_(sakuSisa) + (sakuDariKas ? ' diambil dari uang kas dalam perjalanan.' : ' dibayarkan setelah dinas selesai.') : '') + '</p>' +
+      (sakuSisa ? 'Uang saku ' + rpH_(sakuSisa) + (sakuDariKas ? ' diambil dari uang kas dinas.' : ' dibayarkan setelah dinas selesai.') : '') + '</p>' +
       (kasKembali < 0 ? '<p><b style="color:#B42318">Status: KURANG KAS</b> — setelah kekurangan dipotong dari gaji ketua tim, catat potongannya di form Pertanggungjawaban Dinas agar surat SELESAI.</p>' : '') +
       '<p>PDF laporan terlampir: <a href="' + file.getUrl() + '">' + escH_(file.getName()) + '</a></p>';
     const admin = String(P.EMAIL_ADMIN || '').trim().toLowerCase(), pembuat = String(S.emailPembuat || u.email).toLowerCase();
@@ -2324,7 +2324,7 @@ function buatPdfPtj_(S, R) {
     sek('B. REALISASI PERJALANAN') +
     kv([['Berangkat Aktual', tg(R.berangkat), 'Kembali Aktual', tg(R.kembali)],
         ['Lama Aktual', R.lamaAktual + ' hari', 'Pengesahan Tujuan', R.pengesahan ? 'Diterima' : 'Belum diterima']]) +
-    sek('C. PERSONEL & UANG SAKU (' + (R.sakuDariKas ? 'DIAMBIL DARI UANG KAS DALAM PERJALANAN' : 'DIBAYARKAN SETELAH DINAS SELESAI') + ')') +
+    sek('C. PERSONEL & UANG SAKU (' + (R.sakuDariKas ? 'DIAMBIL DARI UANG KAS DINAS' : 'DIBAYARKAN SETELAH DINAS SELESAI') + ')') +
     '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Employee ID', 'Full Name', 'Lama Rencana', 'Lama Aktual', 'Uang Saku Rencana', 'Uang Saku Realisasi', 'Keterangan'].map(thP_).join('') + '</tr>' +
     R.personel.map((p, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(p.ref.id)) + tdP_('<b>' + escH_(p.ref.nama) + '</b>') +
       tdP_(p.ref.lama + ' hari', 'text-align:center') + tdP_(p.lama + ' hari', 'text-align:center') + tdP_(rpH_(p.ref.uangSaku), 'text-align:right') +
@@ -2334,16 +2334,16 @@ function buatPdfPtj_(S, R) {
     (R.biaya.length ? '<table style="border-collapse:collapse;width:100%"><tr>' + ['No', 'Jenis Biaya', 'Uraian', 'Jumlah (Rp)', 'Bukti'].map(thP_).join('') + '</tr>' +
       R.biaya.map((b, i) => '<tr>' + tdP_(i + 1, 'text-align:center') + tdP_(escH_(b.jenis)) + tdP_(escH_(b.uraian)) + tdP_(rpH_(b.jumlah), 'text-align:right') + tdP_(b.link ? '<a href="' + escH_(b.link) + '" style="color:#1F5FBF">Ada (lihat)</a>' : 'Tidak ada', 'text-align:center') + '</tr>').join('') +
       totRow('TOTAL BIAYA LAINNYA', 3, rpH_(R.lainReal), 1) + '</table>' : '<div style="font-size:9px;color:#777">Tidak ada biaya lainnya.</div>') +
-    sek('E. PERHITUNGAN UANG KAS DALAM PERJALANAN') +
+    sek('E. PERHITUNGAN UANG KAS DINAS') +
     '<table style="width:100%;border-collapse:collapse;font-size:10px">' +
-    [].concat(R.tambahKas && R.tambahKas.length ? [['Uang kas dalam perjalanan awal', rpH_(R.kasAwal)]].concat(R.tambahKas.map(t => ['Tambahan uang kas' + (t.tanggal ? ' ' + tglIndo_(keTanggal_(t.tanggal)) : '') + ' — ' + escH_(t.alasan), rpH_(t.nominal)])) : [],
-      [['Total uang kas dalam perjalanan (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )']],
+    [].concat(R.tambahKas && R.tambahKas.length ? [['Uang kas dinas awal', rpH_(R.kasAwal)]].concat(R.tambahKas.map(t => ['Tambahan uang kas' + (t.tanggal ? ' ' + tglIndo_(keTanggal_(t.tanggal)) : '') + ' — ' + escH_(t.alasan), rpH_(t.nominal)])) : [],
+      [['Total uang kas dinas (diterima)', rpH_(R.uangKas)], ['Dikurangi: total biaya lainnya (realisasi, bagian D)', '( ' + rpH_(R.lainReal) + ' )']],
       R.sakuDariKas && R.sakuSisa ? [['Dikurangi: uang saku personel (bagian C' + (R.sakuKasir ? ', tanpa yang dibayar kasir' : '') + ')', '( ' + rpH_(R.sakuSisa) + ' )']] : [],
       [[R.kasKembali >= 0 ? 'UANG KAS YANG HARUS DIKEMBALIKAN' : 'KEKURANGAN UANG KAS (dipotong dari gaji ketua tim ' + escH_(sdr_(R.ketua)) + ')', rpH_(Math.abs(R.kasKembali))]])
       .map((r, i, a) => { const akhir = i === a.length - 1; return '<tr><td style="padding:5px;border:' + (akhir ? '2px solid #BE353F' : '1px solid #BBB') + ';font-weight:bold">' + r[0] + '</td><td style="padding:5px;border:' +
         (akhir ? '2px solid #BE353F;color:#BE353F' : '1px solid #BBB') + ';text-align:right;font-weight:bold;width:140px">' + r[1] + '</td></tr>'; }).join('') + '</table>' +
     '<div style="font-size:9px;color:#555;margin-top:4px">' + (R.sakuKasir ? 'Uang saku ' + rpH_(R.sakuKasir) + ' untuk personel yang lapor pulang lebih dulu sudah dibayar kasir di kantor. ' : '') +
-      (R.sakuSisa ? 'Uang saku personel ' + rpH_(R.sakuSisa) + (R.sakuDariKas ? ' diambil dari uang kas dalam perjalanan.' : ' dibayarkan setelah dinas selesai dan tidak termasuk perhitungan uang kas.') : '') + '</div>' +
+      (R.sakuSisa ? 'Uang saku personel ' + rpH_(R.sakuSisa) + (R.sakuDariKas ? ' diambil dari uang kas dinas.' : ' dibayarkan setelah dinas selesai dan tidak termasuk perhitungan uang kas.') : '') + '</div>' +
     sek('F. RINGKASAN HASIL KEGIATAN') +
     '<div style="border:1px solid #BBB;padding:8px;font-size:10px;white-space:pre-wrap;min-height:40px">' + escH_(R.ringkasan) + '</div>' +
     '<p style="text-align:right;font-size:10px;margin-top:12px">' + (param_().KOTA_SURAT ? escH_(param_().KOTA_SURAT) + ', ' : '') + tglIndo_(R.pada) + '</p>' +
@@ -2362,7 +2362,7 @@ function buatPdfPtj_(S, R) {
  *      Persetujuan oleh atasan penyetuju dinas (1 email + 1 tombol per atasan),
  *      owner mendapat pemberitahuan (mengetahui). Setelah semua atasan memproses →
  *      lama & uang saku personel diperbarui, PDF surat direvisi.
- *   2. TAMBAH KAS — admin mencatat tambahan uang kas dalam perjalanan. Ketua tim
+ *   2. TAMBAH KAS — admin mencatat tambahan uang kas dinas. Ketua tim
  *      (personel disetujui No. 1) menerima email + PDF revisi dan mengonfirmasi
  *      sudah menerima uang kas tambahan.
  *  Link email: a=pp (persetujuan perpanjangan), a=kt (konfirmasi terima kas).
@@ -2685,8 +2685,8 @@ function kirimTambahKas_(id) {
   const U = bacaUbah_(SH_UBAH.UBAH), r = U.rows.find(x => String(x['ID']) === String(id));
   if (!r) return;
   const nomor = r['Nomor SPD'], total = (Number(induk_('SPD', nomor)['Uang Kas Perjalanan']) || 0) + tambahanKas_(nomor);
-  const ringkas = '<p>Uang kas dalam perjalanan ditambah sebesar <b>' + rpH_(r['Tambah Kas']) + '</b> — keperluan: ' + escH_(r['Alasan']) + '.<br>' +
-    'Total uang kas dalam perjalanan menjadi <b>' + rpH_(total) + '</b>.</p>';
+  const ringkas = '<p>Uang kas dinas ditambah sebesar <b>' + rpH_(r['Tambah Kas']) + '</b> — keperluan: ' + escH_(r['Alasan']) + '.<br>' +
+    'Total uang kas dinas menjadi <b>' + rpH_(total) + '</b>.</p>';
   const R = kirimRevisiSpd_(nomor, 'Tambahan Uang Kas Dinas', ringkas, [], false, r['Email Pembuat'], true);
   const ketua = R && R.ketua;
   if (!ketua || !ketua.email) { ubahBaris_(U, r._row, { 'Status Email': 'GAGAL: ketua tim tanpa email' }); return; }
@@ -2706,7 +2706,7 @@ function halamanTerimaKas_(p) {
     const I = induk_('SPD', r['Nomor SPD']);
     const serah = r['Jenis'] === 'SERAH KAS';
     isi = '<h2>Konfirmasi ' + (serah ? 'Serah Terima' : 'Tambahan') + ' Uang Kas</h2><p><b>' + escH_(r['Nomor SPD']) + '</b><br>' + escH_(I['Tempat Tujuan']) + '</p>' +
-      '<p>' + (serah ? 'Uang kas yang diterima' : 'Tambahan uang kas dalam perjalanan') + ': <b>' + rpH_(r['Tambah Kas']) + '</b><br>' + (serah ? '' : 'Keperluan: ') + escH_(r['Alasan']) + '</p>';
+      '<p>' + (serah ? 'Uang kas yang diterima' : 'Tambahan uang kas dinas') + ': <b>' + rpH_(r['Tambah Kas']) + '</b><br>' + (serah ? '' : 'Keperluan: ') + escH_(r['Alasan']) + '</p>';
     if (r['Status'] === UBAH_ST.DITERIMA) isi += '<div class="msg info">Sudah dikonfirmasi diterima' + (r['Dikonfirmasi Pada'] instanceof Date ? ' pada ' + waktuIndo_(r['Dikonfirmasi Pada']) : '') + '.</div>';
     else isi += '<button id="b" onclick="kirim()">✅ Saya sudah menerima uang kas' + (serah ? '' : ' tambahan') + '</button><div id="o"></div>' +
       '<script>function kirim(){var b=document.getElementById("b"),o=document.getElementById("o");b.disabled=true;b.textContent="Mengirim…";' +
@@ -2733,7 +2733,7 @@ function prosesTerimaKas(id, sig) {
     logAksi_('SPD', r['Nomor SPD'], 'TAMBAH KAS DITERIMA', ketua ? ketua.email : '', rpH_(r['Tambah Kas']));
   } finally { lock.releaseLock(); }
   kirimEmail_(r['Email Pembuat'], (r['Jenis'] === 'SERAH KAS' ? 'Serah Terima' : 'Tambahan') + ' Uang Kas Diterima — ' + r['Nomor SPD'],
-    '<p><b>' + escH_(sdr_(ketua ? ketua.nama : '-')) + '</b> telah mengonfirmasi <b style="color:#1E7B4A">SUDAH MENERIMA</b> ' + (r['Jenis'] === 'SERAH KAS' ? 'serah terima' : 'tambahan') + ' uang kas dalam perjalanan sebesar <b>' +
+    '<p><b>' + escH_(sdr_(ketua ? ketua.nama : '-')) + '</b> telah mengonfirmasi <b style="color:#1E7B4A">SUDAH MENERIMA</b> ' + (r['Jenis'] === 'SERAH KAS' ? 'serah terima' : 'tambahan') + ' uang kas dinas sebesar <b>' +
     rpH_(r['Tambah Kas']) + '</b> untuk Surat Perintah Dinas ' + escH_(r['Nomor SPD']) + '.</p><p>' + escH_(r['Alasan']) + '</p>');
   return 'Terima kasih. Penerimaan uang kas ' + rpH_(r['Tambah Kas']) + ' telah dikonfirmasi.';
 }
@@ -2828,14 +2828,14 @@ function laporPulang(token, d) {
     escH_(hariIndo_(keTanggal_(hasil.pulang)) + ', ' + tglIndo_(keTanggal_(hasil.pulang))) + '</b> — lama dinas ' + hasil.lama + ' hari.</p>' +
     '<p>Uang saku <b>' + rpH_(hasil.uangSaku) + '</b> dibayarkan oleh kasir di kantor (tidak termasuk pertanggungjawaban ketua tim). ' +
     'Karyawan dapat diajukan lembur kembali mulai hari berikutnya.</p>' +
-    (hasil.serah ? '<p>Uang kas dalam perjalanan sebesar <b>' + rpH_(hasil.serah.nominal) + '</b> diserahkan kepada <b>' + escH_(hasil.serah.ke) + '</b> sebagai ketua tim baru ' +
+    (hasil.serah ? '<p>Uang kas dinas sebesar <b>' + rpH_(hasil.serah.nominal) + '</b> diserahkan kepada <b>' + escH_(hasil.serah.ke) + '</b> sebagai ketua tim baru ' +
       '(menunggu konfirmasi penerimaan). Kekurangan kas di pertanggungjawaban akhir menjadi tanggungan ketua tim baru.</p>' : '') +
     '<p>Dicatat oleh ' + escH_(sdr_(u.nama)) + '.</p>', admin && admin !== pembuat ? admin : '');
   if (hasil.serah) {
     const k = karyawan_()[hasil.serah.keId], I = induk_('SPD', hasil.nomor);
     if (k && k.email) {
       const err = kirimEmail_(k.email, 'Serah Terima Uang Kas Dinas ' + hasil.nomor,
-        '<p>Yth. <b>' + escH_(sdr_(k.nama)) + '</b>,</p><p><b>' + escH_(hasil.serah.dari) + '</b> pulang lebih dulu. Anda ditunjuk sebagai <b>ketua tim</b> dan menerima uang kas dalam perjalanan sebesar <b>' +
+        '<p>Yth. <b>' + escH_(sdr_(k.nama)) + '</b>,</p><p><b>' + escH_(hasil.serah.dari) + '</b> pulang lebih dulu. Anda ditunjuk sebagai <b>ketua tim</b> dan menerima uang kas dinas sebesar <b>' +
         rpH_(hasil.serah.nominal) + '</b>.</p>' + tabelRingkasDinas_({ 'Full Name': k.nama, 'Employee ID': k.id, 'Uang Saku': 0 }, I).replace(/<tr><td[^>]*>Uang Saku<\/td><td[^>]*>[^<]*<\/td><\/tr>/, '').replace('>Personel<', '>Ketua Tim<') +
         '<p>Mohon konfirmasi bahwa Anda sudah menerima uang kas tersebut:</p><p style="margin-top:14px">' + tombol_(linkAksi_('kt', hasil.serah.id), '✅ Sudah Diterima', '#1E7B4A') + '</p>' +
         '<p>Sebagai ketua tim, Anda melaporkan uang kas, biaya &amp; bukti kepada admin setelah dinas selesai.</p>');
