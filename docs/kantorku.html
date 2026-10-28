@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Buka KantorKu — PT Citra Banjar Abadi</title>
+<meta name="robots" content="noindex">
+<style>
+  :root{--brand:#6C3AD6;--ink:#222;--mute:#6B6F76;--bg:#F5F5F6}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font-family:Arial,Helvetica,sans-serif}
+  main{max-width:420px;margin:0 auto;padding:40px 16px;text-align:center}
+  h1{font-size:18px;margin:0 0 6px}
+  p{color:var(--mute);font-size:14px;line-height:1.5;margin:0 0 20px}
+  a.btn{display:block;padding:14px 16px;border-radius:10px;text-decoration:none;font-weight:bold;font-size:15px;margin:10px 0}
+  a.utama{background:var(--brand);color:#fff}
+  a.sek{background:#fff;color:var(--brand);border:1px solid #E3DCF5}
+</style>
+</head>
+<body>
+<main>
+  <h1>Membuka aplikasi KantorKu…</h1>
+  <p>Bila aplikasi tidak terbuka otomatis, pilih salah satu tombol di bawah.</p>
+  <a class="btn utama" id="app" href="#">Buka aplikasi KantorKu</a>
+  <a class="btn sek" id="toko" href="#">Pasang dari toko aplikasi</a>
+  <a class="btn sek" href="https://hris.kantorku.id">Buka versi web</a>
+</main>
+<script>
+(function () {
+  var PKG = 'com.dealls.hris.kantorku';
+  var PLAY = 'https://play.google.com/store/apps/details?id=' + PKG;
+  var APPSTORE = 'https://apps.apple.com/id/app/kantorku-hris-by-dealls/id6474457511';
+  var WEB = 'https://hris.kantorku.id';
+  var ua = navigator.userAgent || '';
+  var android = /Android/i.test(ua), ios = /iPhone|iPad|iPod/i.test(ua) || (/Macintosh/.test(ua) && 'ontouchend' in document);
+  var intent = 'intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;package=' + PKG +
+    ';S.browser_fallback_url=' + encodeURIComponent(PLAY) + ';end';
+  var app = document.getElementById('app'), toko = document.getElementById('toko');
+  if (android) { app.href = intent; toko.href = PLAY; location.href = intent; }
+  else if (ios) { app.href = APPSTORE; toko.href = APPSTORE; location.href = APPSTORE; }
+  else { location.replace(WEB); }
+})();
+</script>
+</body>
+</html>

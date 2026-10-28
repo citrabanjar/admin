@@ -1167,8 +1167,13 @@ function tabelDetail_(jenis, r, I, denganKompensasi, tanpaPersonel) {
 }
 
 /* ======================= Instruksi KantorKu (setelah karyawan Bersedia) ======================= */
+/** Tombol "Buka KantorKu": halaman pengalih di form.citrabanjar.com (Android → aplikasi / Play Store, iPhone → App Store, komputer → web) */
+function linkKantorku_() {
+  const w = String(param_().URL_WEB_APP || '').trim();
+  return /^https:\/\/(?!script\.google)/.test(w) ? w.replace(/\/?$/, '/') + 'kantorku.html' : String(param_().URL_KANTORKU || 'https://hris.kantorku.id').trim();
+}
 function htmlInstruksiKantorku_() {
-  const url = String(param_().URL_KANTORKU || 'https://hris.kantorku.id').trim();
+  const url = linkKantorku_();
   return '<div class="instruksi">Silakan lanjutkan pengajuan lembur melalui aplikasi KantorKu:' +
     '<a class="kk" href="' + escH_(url) + '" target="_blank" rel="noopener">' +
     '<img src="' + LOGO_KANTORKU_URI + '" alt="KantorKu"><span>Buka aplikasi ›</span></a></div>';
@@ -1211,7 +1216,7 @@ function tabelRingkasDinas_(r, I) {
  *  ulang = true (menu kirim ulang): kirim lagi ke semua karyawan surat itu tanpa membuat rekap. */
 function kirimSuratLembur_(nomor, ulang) {
   pastikanKolom_(JENIS.SPL.sheet, KOLOM_SPL_TAMBAHAN);
-  const S = bacaBaris_('SPL'), K = karyawan_(), url = String(param_().URL_KANTORKU || 'https://hris.kantorku.id').trim();
+  const S = bacaBaris_('SPL'), K = karyawan_(), url = linkKantorku_();
   S.rows.filter(r => r['Nomor SPL'] === nomor && r['Status'] === ST.SETUJU && (ulang || !/^Surat terkirim/.test(String(r['Status Email'] || '')))).forEach(r => {
     const k = K[String(r['Employee ID']).toUpperCase()] || {};
     if (!k.email) { ubahBaris_(S, r._row, { 'Status Email': 'Tanpa email karyawan' }); return; }
