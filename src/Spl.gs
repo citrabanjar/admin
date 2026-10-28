@@ -57,7 +57,8 @@ function simpanSPL(token, data) {
       'Istirahat': x.h.istirahat, 'Jam Efektif': x.h.jamEfektif, 'Estimasi Kompensasi': x.h.kompensasi,
       'Uraian Pekerjaan': String(x.b.uraian).trim(),
       'Dibuat Oleh': u.nama, 'Email Pembuat': u.email, 'Dibuat Pada': now,
-      'Status': ST.KONFIRMASI,
+      'Status': ST.SETUJU,   // tanpa konfirmasi karyawan & persetujuan atasan — surat langsung terbit
+      'Atasan': (cariAtasan_(x.k.id) || {}).nama || '', 'Email Atasan': (cariAtasan_(x.k.id) || {}).email || '',
       'Catatan': [].concat(data.liburNasional && !liburSet_()[tglStr] ? ['Ditandai libur nasional oleh admin'] : [], x.h.peringatan).join(' | '),
       'Status Email': 'Mengirim…',
       'ID Baris': Utilities.getUuid().slice(0, 8)
@@ -67,12 +68,12 @@ function simpanSPL(token, data) {
     if (data.liburNasional) catatLibur_(tglStr, u.nama);
     const totalJam = hasil.reduce((s, x) => s + x.h.jamEfektif, 0);
     logAksi_('SPL', nomor, 'DIBUAT', u.email, hasil.length + ' karyawan, ' + totalJam + ' jam, tgl ' + tglStr);
-    hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: ST.KONFIRMASI };
+    hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: 'TERBIT' };
   } finally {
     lock.releaseLock();
   }
-  // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
-  try { antri_({ t: 'konfirmasi', jenis: 'SPL', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  // Surat Perintah Lembur langsung dikirim ke tiap karyawan + rekap ke atasan / owner (di luar kunci)
+  try { antri_({ t: 'suratLembur', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 

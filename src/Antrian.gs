@@ -76,6 +76,7 @@ function kembalikanTugas_(P, t) {
 
 function jalankanTugas_(t) {
   if (t.t === 'konfirmasi') return kirimKonfirmasi_(t.jenis, t.nomor);
+  if (t.t === 'suratLembur') return kirimSuratLembur_(t.nomor);
   if (t.t === 'selesai') return cekSelesai_(t.jenis, t.nomor);
   if (t.t === 'batal') return batalLanjutan_(t);
   if (t.t === 'persetujuanDinas') return kirimPersetujuanDinas_(t.nomor);

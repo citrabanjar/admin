@@ -830,7 +830,8 @@ function simpanSPL(token, data) {
       'Istirahat': x.h.istirahat, 'Jam Efektif': x.h.jamEfektif, 'Estimasi Kompensasi': x.h.kompensasi,
       'Uraian Pekerjaan': String(x.b.uraian).trim(),
       'Dibuat Oleh': u.nama, 'Email Pembuat': u.email, 'Dibuat Pada': now,
-      'Status': ST.KONFIRMASI,
+      'Status': ST.SETUJU,   // tanpa konfirmasi karyawan & persetujuan atasan — surat langsung terbit
+      'Atasan': (cariAtasan_(x.k.id) || {}).nama || '', 'Email Atasan': (cariAtasan_(x.k.id) || {}).email || '',
       'Catatan': [].concat(data.liburNasional && !liburSet_()[tglStr] ? ['Ditandai libur nasional oleh admin'] : [], x.h.peringatan).join(' | '),
       'Status Email': 'Mengirim…',
       'ID Baris': Utilities.getUuid().slice(0, 8)
@@ -840,12 +841,12 @@ function simpanSPL(token, data) {
     if (data.liburNasional) catatLibur_(tglStr, u.nama);
     const totalJam = hasil.reduce((s, x) => s + x.h.jamEfektif, 0);
     logAksi_('SPL', nomor, 'DIBUAT', u.email, hasil.length + ' karyawan, ' + totalJam + ' jam, tgl ' + tglStr);
-    hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: ST.KONFIRMASI };
+    hasilSimpan = { ok: true, nomor: nomor, jumlah: hasil.length, totalJam: totalJam, status: 'TERBIT' };
   } finally {
     lock.releaseLock();
   }
-  // Email konfirmasi ke tiap karyawan (di luar kunci agar pengguna lain tidak menunggu)
-  try { antri_({ t: 'konfirmasi', jenis: 'SPL', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
+  // Surat Perintah Lembur langsung dikirim ke tiap karyawan + rekap ke atasan / owner (di luar kunci)
+  try { antri_({ t: 'suratLembur', nomor: hasilSimpan.nomor }); } catch (e) { logAksi_('SPL', hasilSimpan.nomor, 'EMAIL GAGAL', u.email, String(e)); }
   return hasilSimpan;
 }
 
@@ -1037,7 +1038,7 @@ const ST = {
   SETUJU: 'DISETUJUI', TOLAK: 'DITOLAK', BATAL: 'DIBATALKAN'
 };
 const ST_FINAL = [ST.TIDAK, ST.SETUJU, ST.TOLAK, ST.BATAL];
-const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'Link PDF Atasan', 'KantorKu', 'Dibatalkan Oleh', 'Dibatalkan Pada', 'Alasan Pembatalan'];
+const KOLOM_SPL_TAMBAHAN = ['Atasan', 'Email Atasan', 'Link PDF Atasan Langsung', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Catatan Atasan', 'Link PDF', 'Link PDF Owner', 'Link PDF Atasan', 'KantorKu', 'Dibatalkan Oleh', 'Dibatalkan Pada', 'Alasan Pembatalan'];
 const KOLOM_SPD_TAMBAHAN = ['Status', 'Konfirmasi Pada', 'Alasan Tidak Bersedia', 'Atasan', 'Email Atasan',
   'Disetujui Oleh', 'Disetujui Pada', 'Catatan Atasan', 'Status Email', 'ID Baris'];
 
@@ -1207,6 +1208,23 @@ function tabelRingkasDinas_(r, I) {
     [['Diperintahkan oleh', sdr_((owner_()[0] || {}).nama || I['Dibuat Oleh'])]]);
   return '<table style="border-collapse:collapse;width:100%;font-size:13px">' + baris.map(b => '<tr><td style="padding:6px 8px;background:#F4F5F7;width:150px;border:1px solid #E2E4E8;font-weight:bold">' +
     escH_(b[0]) + '</td><td style="padding:6px 8px;border:1px solid #E2E4E8">' + escH_(b[1]) + '</td></tr>').join('') + '</table>';
+}
+/** Surat Perintah Lembur langsung terbit: email ke tiap karyawan (tanpa tombol konfirmasi), lalu rekap admin / atasan / owner.
+ *  ulang = true (menu kirim ulang): kirim lagi ke semua karyawan surat itu tanpa membuat rekap. */
+function kirimSuratLembur_(nomor, ulang) {
+  pastikanKolom_(JENIS.SPL.sheet, KOLOM_SPL_TAMBAHAN);
+  const S = bacaBaris_('SPL'), K = karyawan_(), url = String(param_().URL_KANTORKU || 'https://hris.kantorku.id').trim();
+  S.rows.filter(r => r['Nomor SPL'] === nomor && r['Status'] === ST.SETUJU && (ulang || !/^Surat terkirim/.test(String(r['Status Email'] || '')))).forEach(r => {
+    const k = K[String(r['Employee ID']).toUpperCase()] || {};
+    if (!k.email) { ubahBaris_(S, r._row, { 'Status Email': 'Tanpa email karyawan' }); return; }
+    const err = kirimEmail_(k.email, 'Surat Perintah Lembur ' + nomor,
+      '<p>Yth. <b>' + escH_(sdr_(r['Full Name'])) + '</b>,</p><p>Anda ditugaskan lembur dengan rincian berikut:</p>' + tabelDetail_('SPL', r, r, true) +
+      '<p style="margin-top:14px">Silakan ajukan lembur melalui aplikasi KantorKu sesuai tanggal &amp; jam di atas.</p>' +
+      '<p>' + tombol_(url, 'Buka KantorKu', '#6C3AD6') + '</p>');
+    ubahBaris_(S, r._row, { 'Status Email': err ? 'GAGAL: ' + err : 'Surat terkirim ke ' + k.email + ' ' + Utilities.formatDate(new Date(), TZ, 'dd/MM HH:mm') });
+  });
+  SpreadsheetApp.flush();
+  if (!ulang) rekapSPL_(nomor);
 }
 function kirimKonfirmasiSPL_(nomor) { kirimKonfirmasi_('SPL', nomor); }
 
@@ -1539,6 +1557,23 @@ function rekapSPL_(nomor, paksa, sudah) {
     kirimRekapApproval_(hari, file, pdf, lama.length > 0, nomor, hasil);
   }
 
+  // 3a. rekap atasan langsung — karyawan langsung di bawahnya, TANPA estimasi kompensasi
+  const daftarLangsung = {};
+  S.rows.filter(r => r['Nomor SPL'] === nomor).forEach(r => { const a = cariAtasan_(r['Employee ID']); if (a && !isOwner_(a)) daftarLangsung[a.id] = a; });
+  Object.values(daftarLangsung).forEach(a => {
+    const grp = hari.filter(r => { const x = cariAtasan_(r['Employee ID']); return x && x.id === a.id; });
+    if (sudah['lgs:' + a.id] || !grp.length || !(paksa || (fin(grp) && grp.some(r => !r['Link PDF Atasan Langsung'])))) return;
+    sudah['lgs:' + a.id] = 1;
+    const lama = [...new Set(grp.map(r => r['Link PDF Atasan Langsung']).filter(Boolean))];
+    const pdf = buatPdfSPL_(grp, { estimasi: false, owner: true, nama: 'Rekap Lembur ' + tglFile_(r0) + ' - ' + a.nama });
+    const file = folderPdf_(JENIS.SPL.folder).createFile(pdf);
+    lama.forEach(hapusPdfLama_);
+    grp.forEach(r => ubahBaris_(S, r._row, { 'Link PDF Atasan Langsung': file.getUrl() }));
+    kirimRekap_(a.email, grp, file, pdf, lama.length > 0, 'Karyawan di bawah ' + sdr_(a.nama), false, null, Object.assign({}, a, { tanpaEstimasi: true }));
+    logAksi_('SPL', nomor, lama.length ? 'PDF REKAP ATASAN LANGSUNG DIPERBARUI' : 'PDF REKAP ATASAN LANGSUNG', a.email, file.getUrl());
+    hasil.push('PDF rekap atasan langsung dikirim ke ' + a.nama);
+  });
+
   // 3. rekap atasan di atas atasan langsung (selain owner) — karyawan di bawah kewenangannya, dengan estimasi & tombol batal
   const rantai = r => rantaiAtasan_(r['Employee ID']).slice(1);   // tanpa atasan langsung (sudah menyetujui per orang)
   const daftarAtasan = {};
@@ -1586,8 +1621,7 @@ function kirimRekap_(ke, rows, file, pdf, revisi, label, owner, batalId, atasan)
     (revisi ? '<p style="background:#FFF4D6;padding:8px 10px;border-radius:6px"><b>Laporan diperbarui</b> — laporan sebelumnya sudah dihapus, gunakan PDF terbaru ini.</p>' : '') +
     '<p>Terlampir kami sampaikan rekap Surat Perintah Lembur tanggal <b>' + escH_(tgl) + '</b> ' + (atasan.semua ? 'untuk seluruh karyawan' : 'di bawah kelolaan ' + escH_(sdr_(atasan.nama))) + ' dengan rincian:</p>' +
     '<table style="font-size:14px;border-collapse:collapse">' +
-    [['Total karyawan yang akan lembur', ok.length + ' orang'],
-     ['Estimasi biaya lembur', rpH_(ok.reduce((t, r) => t + (Number(r['Estimasi Kompensasi']) || 0), 0))]].concat(
+    [['Total karyawan yang akan lembur', ok.length + ' orang']].concat(atasan.tanpaEstimasi ? [] : [['Estimasi biaya lembur', rpH_(ok.reduce((t, r) => t + (Number(r['Estimasi Kompensasi']) || 0), 0))]],
       nAda(ST.TOLAK) ? [['Ditolak atasan langsung', nAda(ST.TOLAK) + ' orang']] : [],
       nAda(ST.TIDAK) ? [['Tidak bersedia', nAda(ST.TIDAK) + ' orang']] : [],
       nAda(ST.BATAL) ? [['Dibatalkan', nAda(ST.BATAL) + ' orang']] : [],
@@ -1658,6 +1692,7 @@ function buatPdfSPL_(rows, opt) {
     if (r['Status'] === ST.BATAL)
       return '<b style="color:#888">DIBATALKAN</b>' + (r['Dibatalkan Oleh'] ? '<br>oleh ' + escH_(r['Dibatalkan Oleh']) + '<br><span style="color:#777">' + waktuIndo_(r['Dibatalkan Pada']) + '</span>' : '') +
         (r['Alasan Pembatalan'] ? '<br><i>' + escH_(r['Alasan Pembatalan']) + '</i>' : '');
+    if (r['Status'] === ST.SETUJU && !r['Disetujui Oleh']) return '<b style="color:#1E7B4A">DITERBITKAN</b>';   // alur baru: tanpa persetujuan atasan
     if (r['Status'] === ST.SETUJU || r['Status'] === ST.TOLAK)
       return '<b style="color:' + (WARNA_ST_[r['Status']] || '#222') + '">' + escH_(r['Status']) + '</b><br>' + escH_(r['Disetujui Oleh']) +
         '<br><span style="color:#777">' + waktuIndo_(r['Disetujui Pada']) + '</span>' + (r['Catatan Atasan'] ? '<br><i>' + escH_(r['Catatan Atasan']) + '</i>' : '');
@@ -1669,10 +1704,10 @@ function buatPdfSPL_(rows, opt) {
     (kolAdmin ? tdP_(escH_(r['Dibuat Oleh'])) : '') + tdP_(escH_(r['Employee ID'])) + tdP_('<b>' + escH_(r['Full Name']) + '</b>');
 
   // A. Karyawan yang bersedia lembur
-  let html = judulTabel('A. KARYAWAN YANG BERSEDIA LEMBUR (' + bersedia.length + ' orang)');
+  let html = judulTabel('A. KARYAWAN YANG LEMBUR (' + bersedia.length + ' orang)');
   if (bersedia.length) {
     html += '<table style="border-collapse:collapse;width:100%"><tr>' +
-      headAwal.concat(['Mulai', 'Selesai', 'Istirahat', 'Jam Efektif'], opt.estimasi ? ['Estimasi Kompensasi'] : [], ['Uraian Pekerjaan', 'Persetujuan Atasan']).map(thP_).join('') + '</tr>' +
+      headAwal.concat(['Mulai', 'Selesai', 'Istirahat', 'Jam Efektif'], opt.estimasi ? ['Estimasi Kompensasi'] : [], ['Uraian Pekerjaan', 'Status']).map(thP_).join('') + '</tr>' +
       bersedia.map((r, i) => '<tr>' + selAwal(r, i) +
         tdP_(escH_(r['Jam Mulai']), 'text-align:center') + tdP_(escH_(r['Jam Selesai']), 'text-align:center') + tdP_(escH_(r['Istirahat']), 'text-align:center') +
         tdP_(String(r['Jam Efektif']).replace('.', ','), 'text-align:center') +
@@ -1846,6 +1881,7 @@ function menuKirimUlangKonfirmasi() {
   const n = r.getResponseText().trim();
   const jenis = jenisDariNomor_(n);
   kirimKonfirmasi_(jenis, n);
+  if (jenis === 'SPL') kirimSuratLembur_(n, true);   // alur baru: surat langsung terbit
   // kirim ulang juga permintaan persetujuan yang masih MENUNGGU ATASAN
   const J = JENIS[jenis], S = bacaBaris_(jenis);
   let nAtasan = 0;
@@ -2057,6 +2093,7 @@ function kembalikanTugas_(P, t) {
 
 function jalankanTugas_(t) {
   if (t.t === 'konfirmasi') return kirimKonfirmasi_(t.jenis, t.nomor);
+  if (t.t === 'suratLembur') return kirimSuratLembur_(t.nomor);
   if (t.t === 'selesai') return cekSelesai_(t.jenis, t.nomor);
   if (t.t === 'batal') return batalLanjutan_(t);
   if (t.t === 'persetujuanDinas') return kirimPersetujuanDinas_(t.nomor);
